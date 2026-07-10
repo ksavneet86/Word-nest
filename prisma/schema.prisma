@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  guardian
+  admin
+}
+
+enum Section {
+  vocab
+  spelling
+  elevenPlus
+  synAnt
+}
+
+enum Difficulty {
+  low
+  moderate
+  high
+}
+
+enum SessionType {
+  quiz
+  blank
+  sentence
+}
+
+model User {
+  id        String   @id // Clerk user id
+  email     String   @unique
+  role      Role     @default(guardian)
+  createdAt DateTime @default(now())
+
+  learnerProfiles LearnerProfile[]
+}
+
+model LearnerProfile {
+  id          String   @id @default(cuid())
+  ownerUserId String
+  owner       User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  name        String
+  avatarEmoji String?
+  settings    Json     @default("{}")
+  pinHash     String?
+  createdAt   DateTime @default(now())
+
+  libraries       Library[]
+  quizSessions    QuizSession[]
+  feedbackReports FeedbackReport[]
+  extendedQueue   ExtendedQueue?
+
+  @@index([ownerUserId])
+}
+
+model Library {
+  id               String   @id @default(cuid())
+  learnerProfileId String
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  section          Section
+  name             String
+  createdAt        DateTime @default(now())
+
+  folders Folder[]
+
+  @@unique([learnerProfileId, section, name])
+  @@index([learnerProfileId, section])
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  libraryId String
+  library   Library  @relation(fields: [libraryId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+
+  wordLists WordList[]
+
+  @@unique([libraryId, name])
+}
+
+model WordList {
+  id        String   @id @default(cuid())
+  folderId  String
+  folder    Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+
+  words Word[]
+
+  @@unique([folderId, name])
+}
+
+model Word {
+  id          String     @id @default(cuid())
+  wordListId  String
+  wordList    WordList   @relation(fields: [wordListId], references: [id], onDelete: Cascade)
+  word        String
+  meaning     String
+  pos         String?
+  synonyms    String[]
+  antonyms    String[]
+  sentenceTip String?
+  emoji       String?
+  pictogramId String?
+  category    String     @default("other")
+  difficulty  Difficulty @default(low)
+  forms       Json       @default("{}")
+  needsMotion Boolean    @default(false)
+  visualQuery String?
+  gifUrl      String?
+  timesWrong  Int        @default(0)
+  srsInterval Int        @default(0)
+  srsDue      DateTime   @default(now())
+  addedAt     DateTime   @default(now())
+
+  @@index([wordListId])
+}
+
+model QuizSession {
+  id               String         @id @default(cuid())
+  learnerProfileId String
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  type             SessionType
+  section          Section
+  listId           String?
+  correct          Int
+  total            Int
+  createdAt        DateTime       @default(now())
+
+  @@index([learnerProfileId, createdAt])
+}
+
+model FeedbackReport {
+  id               String         @id @default(cuid())
+  learnerProfileId String
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  reportText       String
+  createdAt        DateTime       @default(now())
+
+  @@index([learnerProfileId, createdAt])
+}
+
+model ExtendedQueue {
+  id               String         @id @default(cuid())
+  learnerProfileId String         @unique
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  remainingWords   String[]
+}
