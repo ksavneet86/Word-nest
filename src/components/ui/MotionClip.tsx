@@ -39,7 +39,7 @@ export function MotionClip({ word, color = "#7C6FF0" }: { word: WordRecord; colo
         </p>
       ) : url ? (
         // eslint-disable-next-line @next/next/no-img-element -- external Giphy CDN, animated GIF
-        <img src={url} alt="" className="rounded-2xl mt-1 max-h-40 border border-slate-100" />
+        <img src={url} alt="" className="rounded-2xl mt-1 h-56 w-auto max-w-full border border-slate-100" />
       ) : (
         <p className="text-xs text-slate-400">No clip found for this word — the picture above is the best we have.</p>
       )}

@@ -6,8 +6,11 @@ import { Btn } from "@/components/ui/Btn";
 import { EmojiCard } from "@/components/ui/EmojiCard";
 import { EmptyState } from "@/components/EmptyState";
 import { useSettings } from "@/lib/settings-context";
-import { shuffle, playBeep } from "@/lib/client-helpers";
+import { shuffle, playBeep, playCelebration } from "@/lib/client-helpers";
+import { Confetti } from "@/components/Confetti";
 import type { WordRecord } from "@/lib/types";
+
+const CELEBRATE_THRESHOLD = 0.7;
 
 function blankSentence(w: WordRecord) {
   const re = new RegExp(`\\b${w.word}\\b`, "i");
@@ -36,6 +39,7 @@ export function FillBlank({
   const [selected, setSelected] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
+  const [celebrateKey, setCelebrateKey] = useState(0);
 
   const w = order[idx];
   const sentence = w ? blankSentence(w) : "";
@@ -49,6 +53,7 @@ export function FillBlank({
   if (done) {
     return (
       <div className="text-center max-w-sm mx-auto">
+        <Confetti trigger={celebrateKey} />
         <EmojiCard emoji="📝" />
         <h2 className="text-2xl font-extrabold mt-2">Score: {score}/{order.length}</h2>
         <Btn color={color} className="mt-4" onClick={() => { setIdx(0); setScore(0); setDone(false); setSelected(null); }}>
@@ -69,7 +74,12 @@ export function FillBlank({
     setSelected(null);
     if (idx + 1 >= order.length) {
       setDone(true);
-      onSessionComplete?.({ type: "blank", correct: score, total: order.length });
+      const total = order.length;
+      if (total > 0 && score / total >= CELEBRATE_THRESHOLD) {
+        setCelebrateKey((k) => k + 1);
+        playCelebration(soundEnabled);
+      }
+      onSessionComplete?.({ type: "blank", correct: score, total });
     } else {
       setIdx((i) => i + 1);
     }

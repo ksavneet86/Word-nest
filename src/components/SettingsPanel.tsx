@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Settings2, X } from "lucide-react";
+import { Mail, Settings2, X } from "lucide-react";
 import { ToggleRow } from "@/components/ToggleRow";
+import { ShareModal } from "@/components/ShareModal";
+import { Btn } from "@/components/ui/Btn";
 import type { LearnerSettings } from "@/lib/constants";
 
 export function SettingsPanel({
@@ -11,15 +13,20 @@ export function SettingsPanel({
   onClose,
   hasPin,
   onSetPin,
+  learnerId,
+  isOwner,
 }: {
   settings: LearnerSettings;
   onUpdate: (patch: Partial<LearnerSettings>) => void;
   onClose: () => void;
   hasPin: boolean;
   onSetPin: (pin: string | null) => Promise<void>;
+  learnerId: string;
+  isOwner: boolean;
 }) {
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
+  const [showShare, setShowShare] = useState(false);
 
   const savePin = async () => {
     if (pinInput && !/^\d{4}$/.test(pinInput)) {
@@ -44,6 +51,7 @@ export function SettingsPanel({
         <ToggleRow label="Sound effects" desc="Gentle chime on quiz answers." checked={settings.soundEnabled} onChange={(v) => onUpdate({ soundEnabled: v })} />
         <ToggleRow label="First–Then session plan" desc="Shows a simple 'first this, then that' plan before practice starts. Off by default." checked={settings.firstThenEnabled} onChange={(v) => onUpdate({ firstThenEnabled: v })} />
         <ToggleRow label="Errorless practice" desc="Quizzes never show a red 'wrong' — just gently reveal the answer. Off by default." checked={settings.errorlessMode} onChange={(v) => onUpdate({ errorlessMode: v })} />
+        <ToggleRow label="Daily practice reminder" desc="Emails you if this learner hasn't practiced yet today. Off by default." checked={settings.remindersEnabled} onChange={(v) => onUpdate({ remindersEnabled: v })} />
 
         <div>
           <label className="text-sm font-bold text-slate-700">Text size</label>
@@ -90,8 +98,17 @@ export function SettingsPanel({
           {pinError && <p className="text-xs text-red-500 mt-1">{pinError}</p>}
         </div>
 
+        {isOwner && (
+          <div className="border-t border-slate-100 pt-4">
+            <label className="text-sm font-bold text-slate-700">Sharing</label>
+            <p className="text-xs text-slate-400 mb-2">Invite another guardian (e.g. a co-parent) to help manage this learner.</p>
+            <Btn variant="soft" onClick={() => setShowShare(true)}><Mail size={15} /> Manage sharing</Btn>
+          </div>
+        )}
+
         <p className="text-xs text-slate-400">These preferences are saved automatically for this learner and remembered next time, on any device.</p>
       </div>
+      {showShare && <ShareModal learnerId={learnerId} onClose={() => setShowShare(false)} />}
     </div>
   );
 }

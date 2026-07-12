@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   ArrowDownAZ, ArrowUpAZ, Brain, BookOpen, Clock, Download, Layers, Mail, MessageCircle,
-  PencilLine, Plus, Puzzle, Trash2, TrendingUp,
+  PencilLine, Plus, Puzzle, Sparkles, Trash2, TrendingUp,
 } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
 import { EmptyState } from "@/components/EmptyState";
@@ -14,6 +14,7 @@ import { Flashcards } from "@/components/Flashcards";
 import { SentenceBuilder } from "@/components/SentenceBuilder";
 import { FillBlank } from "@/components/FillBlank";
 import { QuizFlow } from "@/components/QuizFlow";
+import { SpellingGameSetup } from "@/components/SpellingGameSetup";
 import { ProgressView } from "@/components/ProgressView";
 import { FirstThenGate } from "@/components/FirstThenGate";
 import { ExtendedGenerator } from "@/components/ExtendedGenerator";
@@ -27,6 +28,7 @@ const TABS = [
   { key: "browse", label: "Browse", icon: BookOpen },
   { key: "add", label: "Add words", icon: Plus },
   { key: "flash", label: "Flashcards", icon: Layers },
+  { key: "spell", label: "Spell it!", icon: Sparkles },
   { key: "sentence", label: "Sentences", icon: Puzzle },
   { key: "quiz", label: "Quiz", icon: Brain },
   { key: "blank", label: "Fill blanks", icon: PencilLine },
@@ -35,10 +37,18 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export function SectionView({ sectionKey, learnerId }: { sectionKey: SectionKey; learnerId: string }) {
+export function SectionView({
+  sectionKey,
+  learnerId,
+  learnerName,
+}: {
+  sectionKey: SectionKey;
+  learnerId: string;
+  learnerName: string;
+}) {
   const meta = SECTIONS[sectionKey];
   const { tree, refetch } = useSectionTree(learnerId, sectionKey);
-  const { sessions, refetch: refetchSessions } = useSessionLog(learnerId);
+  const { sessions, streak, refetch: refetchSessions } = useSessionLog(learnerId);
 
   const [tab, setTab] = useState<TabKey>("browse");
   const [selection, setSelection] = useState<TreeSelection>({ library: "", folder: "", list: "" });
@@ -70,11 +80,11 @@ export function SectionView({ sectionKey, learnerId }: { sectionKey: SectionKey;
     await Promise.all([refetch(), refetchSessions()]);
   };
 
-  const onAnswer = async (word: WordRecord, correct: boolean) => {
+  const onAnswer = async (word: WordRecord, correct: boolean, points?: number) => {
     await fetch("/api/quiz/answer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wordId: word.id, correct }),
+      body: JSON.stringify({ wordId: word.id, correct, points }),
     });
   };
 
@@ -136,7 +146,7 @@ export function SectionView({ sectionKey, learnerId }: { sectionKey: SectionKey;
       </div>
 
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-        {TABS.map((t) => (
+        {TABS.filter((t) => t.key !== "spell" || sectionKey === "spelling").map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
@@ -152,6 +162,8 @@ export function SectionView({ sectionKey, learnerId }: { sectionKey: SectionKey;
         <AddWordsPanel
           tree={tree}
           sectionColor={meta.color}
+          target={selection}
+          onTargetChange={setSelection}
           onCreateLibrary={createLibrary}
           onCreateFolder={createFolder}
           onCreateList={createList}
@@ -228,6 +240,13 @@ export function SectionView({ sectionKey, learnerId }: { sectionKey: SectionKey;
           <EmptyState text="Pick a list above first." />
         ))}
 
+      {tab === "spell" &&
+        (selection.list ? (
+          <SpellingGameSetup words={sortedWords} color={meta.color} onAnswer={onAnswer} onSessionComplete={onSessionComplete} />
+        ) : (
+          <EmptyState text="Pick a list above first." />
+        ))}
+
       {tab === "sentence" &&
         (selection.list ? (
           <FirstThenGate firstLabel="Build sentences from word tiles" thenLabel="Check each one when you're ready" color={meta.color}>
@@ -250,7 +269,17 @@ export function SectionView({ sectionKey, learnerId }: { sectionKey: SectionKey;
           <EmptyState text="Pick a list above first." />
         ))}
 
-      {tab === "progress" && <ProgressView tree={tree} color={meta.color} sessionLog={sessions} learnerId={learnerId} section={sectionKey} />}
+      {tab === "progress" && (
+        <ProgressView
+          tree={tree}
+          color={meta.color}
+          sessionLog={sessions}
+          streak={streak}
+          learnerId={learnerId}
+          learnerName={learnerName}
+          section={sectionKey}
+        />
+      )}
     </div>
   );
 }

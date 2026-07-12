@@ -68,7 +68,7 @@ export function WordDetailCard({ w, color, showSpellingMode }: { w: WordRecord; 
       <RecordPlayback word={w} />
 
       <button onClick={() => setShowSyn((s) => !s)} className="mt-3 text-xs font-bold flex items-center gap-1 min-h-[40px]" style={{ color }}>
-        {showSyn ? <EyeOff size={14} /> : <Eye size={14} />} {showSyn ? "Hide" : "Show"} synonyms &amp; antonyms
+        {showSyn ? <EyeOff size={14} /> : <Eye size={14} />} {showSyn ? "Hide" : "Show"}{" "}synonyms &amp; antonyms
       </button>
       {showSyn && (
         <div className="mt-2 flex gap-4 flex-wrap text-sm">

@@ -7,11 +7,30 @@ import type { Role } from "@prisma/client";
 
 type CurrentUser = { id: string; role: Role };
 
+/** True if the user owns, has been granted access to, or (as admin) can see this learner. */
+export async function hasLearnerAccess(learnerProfileId: string, ownerUserId: string, user: CurrentUser) {
+  if (ownerUserId === user.id || user.role === "admin") return true;
+  const access = await prisma.learnerAccess.findUnique({
+    where: { learnerProfileId_userId: { learnerProfileId, userId: user.id } },
+  });
+  return !!access;
+}
+
 export async function getLearnerOrThrow(learnerProfileId: string, user: CurrentUser) {
   const learner = await prisma.learnerProfile.findUnique({ where: { id: learnerProfileId } });
   if (!learner) throw new NotFoundError("Learner not found");
-  if (learner.ownerUserId !== user.id && user.role !== "admin") {
+  if (!(await hasLearnerAccess(learnerProfileId, learner.ownerUserId, user))) {
     throw new ForbiddenError("You don't have access to this learner");
+  }
+  return learner;
+}
+
+/** Owner-only check — for sharing/invite management, distinct from general read/write access. */
+export async function getOwnedLearnerOrThrow(learnerProfileId: string, user: CurrentUser) {
+  const learner = await prisma.learnerProfile.findUnique({ where: { id: learnerProfileId } });
+  if (!learner) throw new NotFoundError("Learner not found");
+  if (learner.ownerUserId !== user.id && user.role !== "admin") {
+    throw new ForbiddenError("Only the learner's owner can manage sharing");
   }
   return learner;
 }
@@ -24,7 +43,7 @@ export async function listLearners(user: CurrentUser, all: boolean) {
     });
   }
   return prisma.learnerProfile.findMany({
-    where: { ownerUserId: user.id },
+    where: { OR: [{ ownerUserId: user.id }, { access: { some: { userId: user.id } } }] },
     orderBy: { createdAt: "asc" },
   });
 }

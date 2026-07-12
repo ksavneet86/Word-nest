@@ -10,6 +10,8 @@ import { uid } from "@/lib/client-helpers";
 export function AddWordsPanel({
   tree,
   sectionColor,
+  target,
+  onTargetChange,
   onCreateLibrary,
   onCreateFolder,
   onCreateList,
@@ -17,12 +19,13 @@ export function AddWordsPanel({
 }: {
   tree: SectionTree;
   sectionColor: string;
+  target: TreeSelection;
+  onTargetChange: (value: TreeSelection) => void;
   onCreateLibrary: (name: string) => Promise<void>;
   onCreateFolder: (name: string) => Promise<void>;
   onCreateList: (name: string) => Promise<void>;
   onSave: (listId: string, target: TreeSelection, words: GeneratedWord[]) => Promise<void>;
 }) {
-  const [target, setTarget] = useState<TreeSelection>({ library: "", folder: "", list: "" });
   const [mode, setMode] = useState<"type" | "upload">("type");
   const [rawWords, setRawWords] = useState("");
   const [loading, setLoading] = useState(false);
@@ -92,7 +95,7 @@ export function AddWordsPanel({
           tree={tree}
           sectionColor={sectionColor}
           value={target}
-          onChange={setTarget}
+          onChange={onTargetChange}
           onCreateLibrary={onCreateLibrary}
           onCreateFolder={onCreateFolder}
           onCreateList={onCreateList}

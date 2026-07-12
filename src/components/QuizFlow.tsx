@@ -18,7 +18,7 @@ export function QuizFlow({
   tree: SectionTree;
   selection: TreeSelection;
   color: string;
-  onAnswer: (word: WordRecord, correct: boolean) => void;
+  onAnswer: (word: WordRecord, correct: boolean, points?: number) => void;
   onSessionComplete: (entry: { type: "quiz"; correct: number; total: number }) => void;
 }) {
   const [pool, setPool] = useState<WordRecord[] | null>(null);

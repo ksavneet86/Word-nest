@@ -1,5 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["queryCompiler", "driverAdapters"]
+  engineType      = "client"
 }
 
 datasource db {
@@ -39,24 +41,53 @@ model User {
   createdAt DateTime @default(now())
 
   learnerProfiles LearnerProfile[]
+  learnerAccess   LearnerAccess[]
 }
 
 model LearnerProfile {
-  id          String   @id @default(cuid())
-  ownerUserId String
-  owner       User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  name        String
-  avatarEmoji String?
-  settings    Json     @default("{}")
-  pinHash     String?
-  createdAt   DateTime @default(now())
+  id              String   @id @default(cuid())
+  ownerUserId     String
+  owner           User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  name            String
+  avatarEmoji     String?
+  settings        Json     @default("{}")
+  pinHash         String?
+  points          Int      @default(0)
+  unlockedAvatars String[] @default([])
+  createdAt       DateTime @default(now())
 
   libraries       Library[]
   quizSessions    QuizSession[]
   feedbackReports FeedbackReport[]
   extendedQueue   ExtendedQueue?
+  access          LearnerAccess[]
+  invites         LearnerInvite[]
 
   @@index([ownerUserId])
+}
+
+model LearnerAccess {
+  id               String         @id @default(cuid())
+  learnerProfileId String
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+
+  @@unique([learnerProfileId, userId])
+}
+
+model LearnerInvite {
+  id               String         @id @default(cuid())
+  learnerProfileId String
+  learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
+  invitedEmail     String
+  token            String         @unique
+  createdAt        DateTime       @default(now())
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+
+  @@index([learnerProfileId])
 }
 
 model Library {

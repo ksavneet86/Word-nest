@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { SessionEntry } from "@/lib/types";
+import type { SessionEntry, StreakInfo } from "@/lib/types";
+
+const EMPTY_STREAK: StreakInfo = { current: 0, longest: 0 };
 
 export function useSessionLog(learnerId: string | null) {
   const [sessions, setSessions] = useState<SessionEntry[]>([]);
+  const [streak, setStreak] = useState<StreakInfo>(EMPTY_STREAK);
 
   const refetch = useCallback(async () => {
     if (!learnerId) return;
@@ -12,6 +15,7 @@ export function useSessionLog(learnerId: string | null) {
     if (res.ok) {
       const data = await res.json();
       setSessions(data.sessions);
+      setStreak(data.streak ?? EMPTY_STREAK);
     }
   }, [learnerId]);
 
@@ -20,5 +24,5 @@ export function useSessionLog(learnerId: string | null) {
     refetch();
   }, [refetch]);
 
-  return { sessions, refetch };
+  return { sessions, streak, refetch };
 }

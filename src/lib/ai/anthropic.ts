@@ -50,7 +50,9 @@ const GENERATE_SYSTEM =
   "category (one of: animals, food, school, nature, feelings, actions, people, objects, places, time, other), " +
   "forms (an object; if pos is noun include {singular, plural}; if pos is verb include {present, past, pastParticiple}; otherwise omit or use {}), " +
   "needsMotion (true if the word describes something hard to show in one still picture, e.g. speed/manner/emotion-over-time adjectives or adverbs like quick, slow, shy, clumsy — otherwise false), " +
-  "visualQuery (only if needsMotion is true: a short 3-5 word phrase describing a scene that would make a good short video clip of this word in action).";
+  "visualQuery (only if needsMotion is true: a short 1-3 word GIF search tag for this word's meaning — the kind of simple, " +
+  "common phrase that finds a well-tagged, recognizable clip on Giphy, e.g. 'shy kid' or 'running fast'. " +
+  "Prefer simple everyday tags over elaborate scene descriptions, since long descriptive phrases tend to return irrelevant results.)";
 
 /** Ports generateWordBatch() from the reference artifact — batches of 3 words per Claude call. */
 export async function generateWordBatch(words: string[]): Promise<GeneratedWord[]> {

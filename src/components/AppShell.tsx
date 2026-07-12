@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
-import { Loader2, Settings2, Sparkles } from "lucide-react";
+import { Award, Loader2, Settings2, Sparkles, Star } from "lucide-react";
 import { ProfileBar } from "@/components/ProfileBar";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { SectionView } from "@/components/SectionView";
+import { AvatarShop } from "@/components/AvatarShop";
+import { BadgesModal } from "@/components/BadgesModal";
 import { SettingsContext } from "@/lib/settings-context";
 import { SECTIONS, SETTINGS_DEFAULTS, ZOOM_LEVELS, type SectionKey, type LearnerSettings } from "@/lib/constants";
 import type { LearnerSummary } from "@/lib/types";
@@ -17,8 +19,14 @@ export function AppShell() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [settings, setSettings] = useState<LearnerSettings>(SETTINGS_DEFAULTS);
   const [hasPin, setHasPin] = useState(false);
+  const [isOwner, setIsOwner] = useState(true);
+  const [points, setPoints] = useState(0);
+  const [unlockedAvatars, setUnlockedAvatars] = useState<string[]>([]);
+  const [avatarEmoji, setAvatarEmoji] = useState<string | null>(null);
   const [section, setSection] = useState<SectionKey>("vocab");
   const [showSettings, setShowSettings] = useState(false);
+  const [showAvatarShop, setShowAvatarShop] = useState(false);
+  const [showBadges, setShowBadges] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -48,6 +56,10 @@ export function AppShell() {
       .then((data) => {
         setSettings(data.learner.settings);
         setHasPin(data.learner.hasPin);
+        setIsOwner(data.learner.isOwner);
+        setPoints(data.learner.points);
+        setUnlockedAvatars(data.learner.unlockedAvatars);
+        setAvatarEmoji(data.learner.avatarEmoji);
       });
   }, [activeId]);
 
@@ -89,6 +101,16 @@ export function AppShell() {
     setActiveId(data.learner.id);
   };
 
+  const openAvatarShop = async () => {
+    if (activeId) {
+      const data = await fetch(`/api/learners/${activeId}`).then((r) => r.json());
+      setPoints(data.learner.points);
+      setUnlockedAvatars(data.learner.unlockedAvatars);
+      setAvatarEmoji(data.learner.avatarEmoji);
+    }
+    setShowAvatarShop(true);
+  };
+
   if (!learners || !activeId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F7FAFC]">
@@ -110,6 +132,10 @@ export function AppShell() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button onClick={openAvatarShop} className="rounded-full px-3 py-2 bg-amber-50 text-amber-600 text-sm font-bold flex items-center gap-1 min-h-[40px]">
+                <Star size={15} /> {points}
+              </button>
+              <button onClick={() => setShowBadges(true)} className="rounded-full p-2.5 bg-amber-50 text-amber-500 min-w-[40px] min-h-[40px]"><Award size={18} /></button>
               <button onClick={() => setShowSettings(true)} className="rounded-full p-2.5 bg-slate-100 text-slate-500 min-w-[40px] min-h-[40px]"><Settings2 size={18} /></button>
               <UserButton />
             </div>
@@ -131,7 +157,12 @@ export function AppShell() {
         </nav>
 
         <main className="px-5 py-6 max-w-3xl mx-auto">
-          <SectionView key={`${activeId}-${section}`} sectionKey={section} learnerId={activeId} />
+          <SectionView
+            key={`${activeId}-${section}`}
+            sectionKey={section}
+            learnerId={activeId}
+            learnerName={learners.find((l) => l.id === activeId)?.name ?? "Learner"}
+          />
         </main>
 
         <footer className="text-center text-[11px] text-slate-300 pb-6 pt-2">
@@ -139,8 +170,34 @@ export function AppShell() {
         </footer>
 
         {showSettings && (
-          <SettingsPanel settings={settings} onUpdate={updateSettings} onClose={() => setShowSettings(false)} hasPin={hasPin} onSetPin={setPin} />
+          <SettingsPanel
+            settings={settings}
+            onUpdate={updateSettings}
+            onClose={() => setShowSettings(false)}
+            hasPin={hasPin}
+            onSetPin={setPin}
+            learnerId={activeId}
+            isOwner={isOwner}
+          />
         )}
+
+        {showAvatarShop && (
+          <AvatarShop
+            learnerId={activeId}
+            points={points}
+            unlockedAvatars={unlockedAvatars}
+            currentAvatar={avatarEmoji}
+            onClose={() => setShowAvatarShop(false)}
+            onChange={(newPoints, newUnlocked, newAvatar) => {
+              setPoints(newPoints);
+              setUnlockedAvatars(newUnlocked);
+              setAvatarEmoji(newAvatar);
+              setLearners((prev) => prev?.map((l) => (l.id === activeId ? { ...l, avatarEmoji: newAvatar } : l)) ?? prev);
+            }}
+          />
+        )}
+
+        {showBadges && <BadgesModal learnerId={activeId} onClose={() => setShowBadges(false)} />}
       </div>
     </SettingsContext.Provider>
   );

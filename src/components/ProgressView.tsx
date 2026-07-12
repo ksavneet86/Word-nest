@@ -1,7 +1,18 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Download, FileText } from "lucide-react";
+import { Btn } from "@/components/ui/Btn";
 import { EmptyState } from "@/components/EmptyState";
 import { PerformanceGraph } from "@/components/PerformanceGraph";
 import { FeedbackReport } from "@/components/FeedbackReport";
-import type { SectionTree, SessionEntry } from "@/lib/types";
+import { Confetti } from "@/components/Confetti";
+import { useSettings } from "@/lib/settings-context";
+import { playCelebration } from "@/lib/client-helpers";
+import { exportProgressCSV, exportProgressPDF } from "@/lib/export";
+import type { SectionTree, SessionEntry, StreakInfo } from "@/lib/types";
+
+const STREAK_MILESTONES = [3, 7, 14, 30, 60, 100];
 
 function wordStatus(w: { timesWrong: number; srsInterval: number }): "practice" | "mastered" | "learning" {
   if ((w.timesWrong || 0) > 0) return "practice";
@@ -13,15 +24,31 @@ export function ProgressView({
   tree,
   color,
   sessionLog,
+  streak,
   learnerId,
+  learnerName,
   section,
 }: {
   tree: SectionTree;
   color: string;
   sessionLog: SessionEntry[];
+  streak: StreakInfo;
   learnerId: string;
+  learnerName: string;
   section: string;
 }) {
+  const { soundEnabled } = useSettings();
+  const [celebrateKey, setCelebrateKey] = useState(0);
+
+  useEffect(() => {
+    if (STREAK_MILESTONES.includes(streak.current)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- celebrating a milestone reached via a changed prop
+      setCelebrateKey((k) => k + 1);
+      playCelebration(soundEnabled);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streak.current]);
+
   const rows: Array<{ lib: string; folder: string; listName: string; total: number; mastered: number; practice: number }> = [];
 
   Object.entries(tree).forEach(([lib, libNode]) => {
@@ -40,11 +67,32 @@ export function ProgressView({
   const totalWords = rows.reduce((a, r) => a + r.total, 0);
   const totalMastered = rows.reduce((a, r) => a + r.mastered, 0);
 
+  const isMilestone = STREAK_MILESTONES.includes(streak.current);
+
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm text-center">
-        <p className="text-3xl font-extrabold" style={{ color }}>{totalWords ? Math.round((totalMastered / totalWords) * 100) : 0}%</p>
-        <p className="text-sm text-slate-500">mastered overall ({totalMastered}/{totalWords} words)</p>
+      <Confetti trigger={celebrateKey} />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm text-center">
+          <p className="text-3xl font-extrabold" style={{ color }}>{totalWords ? Math.round((totalMastered / totalWords) * 100) : 0}%</p>
+          <p className="text-sm text-slate-500">mastered overall ({totalMastered}/{totalWords} words)</p>
+        </div>
+        <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm text-center">
+          <p className="text-3xl font-extrabold">🔥 {streak.current}</p>
+          <p className="text-sm text-slate-500">
+            day streak{streak.longest > streak.current ? ` (best: ${streak.longest})` : ""}
+            {isMilestone && <span className="block text-amber-500 font-bold">🎉 Milestone!</span>}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        <Btn variant="soft" color={color} onClick={() => exportProgressCSV(learnerName, rows)}>
+          <Download size={15} /> Export CSV
+        </Btn>
+        <Btn variant="soft" color={color} onClick={() => exportProgressPDF(learnerName, rows, sessionLog)}>
+          <FileText size={15} /> Print / Save PDF report
+        </Btn>
       </div>
 
       <PerformanceGraph sessionLog={sessionLog} color={color} />

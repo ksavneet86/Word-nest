@@ -5,8 +5,12 @@ import { Check, RotateCcw } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
 import { EmojiCard } from "@/components/ui/EmojiCard";
 import { EmptyState } from "@/components/EmptyState";
-import { shuffle } from "@/lib/client-helpers";
+import { Confetti } from "@/components/Confetti";
+import { useSettings } from "@/lib/settings-context";
+import { shuffle, playCelebration } from "@/lib/client-helpers";
 import type { WordRecord } from "@/lib/types";
+
+const CELEBRATE_THRESHOLD = 0.7;
 
 interface Tile {
   id: string;
@@ -22,6 +26,7 @@ export function SentenceBuilder({
   color: string;
   onSessionComplete?: (entry: { type: "sentence"; correct: number; total: number }) => void;
 }) {
+  const { soundEnabled } = useSettings();
   const pool = useMemo(
     () => words.filter((w) => w.sentenceTip && new RegExp(`\\b${w.word}\\b`, "i").test(w.sentenceTip)),
     [words]
@@ -32,6 +37,7 @@ export function SentenceBuilder({
   const [checked, setChecked] = useState<"correct" | "wrong" | null>(null);
   const [done, setDone] = useState(false);
   const [score, setScore] = useState(0);
+  const [celebrateKey, setCelebrateKey] = useState(0);
 
   const w = order[idx];
   const correctTokens = useMemo(
@@ -50,6 +56,7 @@ export function SentenceBuilder({
   if (done) {
     return (
       <div className="text-center max-w-sm mx-auto">
+        <Confetti trigger={celebrateKey} />
         <EmojiCard emoji="🧩" />
         <h2 className="text-2xl font-extrabold mt-2">Score: {score}/{order.length}</h2>
         <Btn color={color} className="mt-4" onClick={() => { setIdx(0); setScore(0); setDone(false); setPlaced([]); setChecked(null); }}>
@@ -72,7 +79,12 @@ export function SentenceBuilder({
     setPlaced([]); setChecked(null);
     if (idx + 1 >= order.length) {
       setDone(true);
-      onSessionComplete?.({ type: "sentence", correct: score, total: order.length });
+      const total = order.length;
+      if (total > 0 && score / total >= CELEBRATE_THRESHOLD) {
+        setCelebrateKey((k) => k + 1);
+        playCelebration(soundEnabled);
+      }
+      onSessionComplete?.({ type: "sentence", correct: score, total });
     } else {
       setIdx((i) => i + 1);
     }

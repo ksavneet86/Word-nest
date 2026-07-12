@@ -90,3 +90,19 @@ export interface SessionEntry {
   total: number;
   createdAt: number;
 }
+
+export interface StreakInfo {
+  current: number;
+  longest: number;
+}
+
+export interface LearnerStats {
+  learnerId: string;
+  name: string;
+  avatarEmoji: string | null;
+  points: number;
+  streak: StreakInfo;
+  totalWords: number;
+  totalMastered: number;
+  masteredPercent: number;
+}

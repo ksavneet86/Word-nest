@@ -9,6 +9,27 @@ export const SECTIONS = {
   synAnt: { label: "Synonyms & Antonyms", icon: Shuffle, color: "#F0A63A", soft: "#FDF0DD" },
 } as const;
 
+export interface AvatarShopItem {
+  emoji: string;
+  cost: number;
+  tier: "common" | "rare" | "epic";
+}
+
+export const AVATAR_SHOP: AvatarShopItem[] = [
+  { emoji: "🐶", cost: 15, tier: "common" },
+  { emoji: "🐱", cost: 15, tier: "common" },
+  { emoji: "🐰", cost: 15, tier: "common" },
+  { emoji: "🦊", cost: 15, tier: "common" },
+  { emoji: "🦄", cost: 35, tier: "rare" },
+  { emoji: "🐉", cost: 35, tier: "rare" },
+  { emoji: "🦁", cost: 35, tier: "rare" },
+  { emoji: "🐯", cost: 35, tier: "rare" },
+  { emoji: "🌟", cost: 60, tier: "epic" },
+  { emoji: "🚀", cost: 60, tier: "epic" },
+  { emoji: "🎩", cost: 60, tier: "epic" },
+  { emoji: "🦸", cost: 60, tier: "epic" },
+];
+
 export type SectionKey = keyof typeof SECTIONS;
 
 export const EMOJI_FALLBACK = "📘";
@@ -21,6 +42,7 @@ export interface LearnerSettings {
   soundEnabled: boolean;
   firstThenEnabled: boolean;
   errorlessMode: boolean;
+  remindersEnabled: boolean;
 }
 
 export const SETTINGS_DEFAULTS: LearnerSettings = {
@@ -31,6 +53,7 @@ export const SETTINGS_DEFAULTS: LearnerSettings = {
   soundEnabled: true,
   firstThenEnabled: false,
   errorlessMode: false,
+  remindersEnabled: false,
 };
 
 export const ZOOM_LEVELS: Record<LearnerSettings["textSize"], number> = {
@@ -44,6 +67,37 @@ export const POS_COLORS: Record<string, string> = {
   noun: "#4ECDC4", verb: "#FF7A59", adjective: "#7C6FF0", adverb: "#F0A63A",
   pronoun: "#57B894", preposition: "#E56399", conjunction: "#8FA6CB", interjection: "#F4B942",
 };
+
+/** Points awarded for a correct Quiz answer, scaled by the word's own difficulty rating. */
+export const QUIZ_DIFFICULTY_POINTS: Record<"low" | "moderate" | "high", number> = {
+  low: 2,
+  moderate: 4,
+  high: 6,
+};
+
+export interface BadgeDef {
+  id: string;
+  label: string;
+  emoji: string;
+  metric: "streak" | "mastered" | "points";
+  threshold: number;
+}
+
+export const BADGES: BadgeDef[] = [
+  { id: "streak-3", label: "3-Day Streak", emoji: "🔥", metric: "streak", threshold: 3 },
+  { id: "streak-7", label: "7-Day Streak", emoji: "🔥", metric: "streak", threshold: 7 },
+  { id: "streak-14", label: "14-Day Streak", emoji: "🔥", metric: "streak", threshold: 14 },
+  { id: "streak-30", label: "30-Day Streak", emoji: "🔥", metric: "streak", threshold: 30 },
+  { id: "streak-60", label: "60-Day Streak", emoji: "🔥", metric: "streak", threshold: 60 },
+  { id: "streak-100", label: "100-Day Streak", emoji: "🔥", metric: "streak", threshold: 100 },
+  { id: "mastered-10", label: "10 Words Mastered", emoji: "📖", metric: "mastered", threshold: 10 },
+  { id: "mastered-50", label: "50 Words Mastered", emoji: "📚", metric: "mastered", threshold: 50 },
+  { id: "mastered-100", label: "100 Words Mastered", emoji: "🎓", metric: "mastered", threshold: 100 },
+  { id: "mastered-250", label: "250 Words Mastered", emoji: "🏅", metric: "mastered", threshold: 250 },
+  { id: "points-100", label: "100 Points", emoji: "⭐", metric: "points", threshold: 100 },
+  { id: "points-500", label: "500 Points", emoji: "🌟", metric: "points", threshold: 500 },
+  { id: "points-1000", label: "1000 Points", emoji: "💫", metric: "points", threshold: 1000 },
+];
 
 export const ELEVEN_PLUS_WORDS: Array<
   [word: string, meaning: string, pos: string, synonyms: string[], antonyms: string[], sentenceTip: string, emoji: string]

@@ -7,8 +7,12 @@ import { PictoVisual } from "@/components/ui/PictoVisual";
 import { EmojiCard } from "@/components/ui/EmojiCard";
 import { EmptyState } from "@/components/EmptyState";
 import { useSettings } from "@/lib/settings-context";
-import { shuffle, playBeep } from "@/lib/client-helpers";
+import { shuffle, playBeep, playCelebration } from "@/lib/client-helpers";
+import { QUIZ_DIFFICULTY_POINTS } from "@/lib/constants";
+import { Confetti } from "@/components/Confetti";
 import type { WordRecord } from "@/lib/types";
+
+const CELEBRATE_THRESHOLD = 0.7;
 
 export function Quiz({
   words,
@@ -18,7 +22,7 @@ export function Quiz({
 }: {
   words: WordRecord[];
   color: string;
-  onAnswer?: (word: WordRecord, correct: boolean) => void;
+  onAnswer?: (word: WordRecord, correct: boolean, points?: number) => void;
   onSessionComplete?: (entry: { type: "quiz"; correct: number; total: number }) => void;
 }) {
   const { errorlessMode, soundEnabled } = useSettings();
@@ -27,6 +31,7 @@ export function Quiz({
   const [selected, setSelected] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
+  const [celebrateKey, setCelebrateKey] = useState(0);
 
   const w = order[idx];
   const options = useMemo(() => {
@@ -40,6 +45,7 @@ export function Quiz({
   if (done) {
     return (
       <div className="text-center max-w-sm mx-auto">
+        <Confetti trigger={celebrateKey} />
         <EmojiCard emoji="🏆" />
         <h2 className="text-2xl font-extrabold mt-2">Score: {score}/{order.length}</h2>
         <Btn color={color} className="mt-4" onClick={() => { setIdx(0); setScore(0); setDone(false); setSelected(null); }}>
@@ -55,14 +61,20 @@ export function Quiz({
     const correct = opt === w.meaning;
     if (correct) setScore((s) => s + 1);
     playBeep(correct ? "correct" : "wrong", soundEnabled);
-    onAnswer?.(w, errorlessMode ? true : correct);
+    const effectiveCorrect = errorlessMode ? true : correct;
+    onAnswer?.(w, effectiveCorrect, effectiveCorrect ? QUIZ_DIFFICULTY_POINTS[w.difficulty] : 0);
   };
 
   const finishIfDone = () => {
     setSelected(null);
     if (idx + 1 >= order.length) {
       setDone(true);
-      onSessionComplete?.({ type: "quiz", correct: score, total: order.length });
+      const total = order.length;
+      if (total > 0 && score / total >= CELEBRATE_THRESHOLD) {
+        setCelebrateKey((k) => k + 1);
+        playCelebration(soundEnabled);
+      }
+      onSessionComplete?.({ type: "quiz", correct: score, total });
     } else {
       setIdx((i) => i + 1);
     }

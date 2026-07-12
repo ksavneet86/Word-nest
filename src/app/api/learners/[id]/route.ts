@@ -18,6 +18,9 @@ export async function GET(_request: NextRequest, ctx: Ctx) {
         name: learner.name,
         avatarEmoji: learner.avatarEmoji,
         hasPin: !!learner.pinHash,
+        isOwner: learner.ownerUserId === user.id,
+        points: learner.points,
+        unlockedAvatars: learner.unlockedAvatars,
         settings: { ...SETTINGS_DEFAULTS, ...(learner.settings as object) },
       },
     });
@@ -47,6 +50,9 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
         name: updated.name,
         avatarEmoji: updated.avatarEmoji,
         hasPin: !!updated.pinHash,
+        isOwner: updated.ownerUserId === user.id,
+        points: updated.points,
+        unlockedAvatars: updated.unlockedAvatars,
         settings: { ...SETTINGS_DEFAULTS, ...(updated.settings as object) },
       },
     });

@@ -19,7 +19,11 @@ export async function GET(request: NextRequest) {
     if (!res.ok) return NextResponse.json({ url: null });
     const data = await res.json();
     const item = data?.data?.[0];
-    const url = item?.images?.fixed_height_small?.url || item?.images?.original?.url || null;
+    const url =
+      item?.images?.fixed_height?.url ||
+      item?.images?.fixed_height_small?.url ||
+      item?.images?.original?.url ||
+      null;
     return NextResponse.json({ url });
   } catch (e) {
     return handleApiError(e);

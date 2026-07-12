@@ -2,13 +2,14 @@ import "server-only";
 import { prisma } from "./db";
 import { NotFoundError } from "./api-utils";
 import { ForbiddenError } from "./auth";
+import { hasLearnerAccess } from "./learners";
 import type { SectionTree, WordForms } from "@/lib/types";
 import type { Role, Section } from "@prisma/client";
 
 type CurrentUser = { id: string; role: Role };
 
-function assertOwns(ownerUserId: string, user: CurrentUser) {
-  if (ownerUserId !== user.id && user.role !== "admin") {
+async function assertOwns(learnerProfileId: string, ownerUserId: string, user: CurrentUser) {
+  if (!(await hasLearnerAccess(learnerProfileId, ownerUserId, user))) {
     throw new ForbiddenError("You don't have access to this resource");
   }
 }
@@ -19,7 +20,7 @@ export async function assertLibraryOwnership(libraryId: string, user: CurrentUse
     include: { learnerProfile: true },
   });
   if (!library) throw new NotFoundError("Library not found");
-  assertOwns(library.learnerProfile.ownerUserId, user);
+  await assertOwns(library.learnerProfileId, library.learnerProfile.ownerUserId, user);
   return library;
 }
 
@@ -29,7 +30,7 @@ export async function assertFolderOwnership(folderId: string, user: CurrentUser)
     include: { library: { include: { learnerProfile: true } } },
   });
   if (!folder) throw new NotFoundError("Folder not found");
-  assertOwns(folder.library.learnerProfile.ownerUserId, user);
+  await assertOwns(folder.library.learnerProfileId, folder.library.learnerProfile.ownerUserId, user);
   return folder;
 }
 
@@ -39,7 +40,7 @@ export async function assertListOwnership(listId: string, user: CurrentUser) {
     include: { folder: { include: { library: { include: { learnerProfile: true } } } } },
   });
   if (!list) throw new NotFoundError("List not found");
-  assertOwns(list.folder.library.learnerProfile.ownerUserId, user);
+  await assertOwns(list.folder.library.learnerProfileId, list.folder.library.learnerProfile.ownerUserId, user);
   return list;
 }
 
@@ -49,7 +50,11 @@ export async function assertWordOwnership(wordId: string, user: CurrentUser) {
     include: { wordList: { include: { folder: { include: { library: { include: { learnerProfile: true } } } } } } },
   });
   if (!word) throw new NotFoundError("Word not found");
-  assertOwns(word.wordList.folder.library.learnerProfile.ownerUserId, user);
+  await assertOwns(
+    word.wordList.folder.library.learnerProfileId,
+    word.wordList.folder.library.learnerProfile.ownerUserId,
+    user
+  );
   return word;
 }
 
