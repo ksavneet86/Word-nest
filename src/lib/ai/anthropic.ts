@@ -96,7 +96,27 @@ export async function extractWordsFromFile(base64: string, mediaType: string, is
         { type: "image", source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: base64 } },
         { type: "text", text: "Extract the words." },
       ];
-  return callClaudeJSON<string[]>(EXTRACT_SYSTEM, content, 4096);
+
+  const res = await client().messages.create({
+    model: MODEL,
+    max_tokens: 8192,
+    system: EXTRACT_SYSTEM,
+    messages: [{ role: "user", content }],
+  });
+  const text = extractText(res.content).replace(/```json|```/g, "").trim();
+  try {
+    return JSON.parse(text) as string[];
+  } catch {
+    // Response got cut off mid-array — salvage every complete "word" that was
+    // already emitted before the truncation point instead of failing outright.
+    const salvaged = [...text.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+    if (salvaged.length) return salvaged;
+    throw new Error(
+      res.stop_reason === "max_tokens"
+        ? "The word list was too long to read in one go — try a smaller photo or a shorter section of the list."
+        : "Couldn't understand the AI's response — try again."
+    );
+  }
 }
 
 const FEEDBACK_SYSTEM =
