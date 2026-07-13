@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/server/auth";
 import { handleApiError, BadRequestError } from "@/lib/server/api-utils";
 import { extractWordsFromFile, generateWordBatch } from "@/lib/ai/anthropic";
 
+const MAX_WORDS_PER_UPLOAD = 40;
+
 export async function POST(request: NextRequest) {
   try {
     await requireUser();
@@ -14,11 +16,12 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = buffer.toString("base64");
 
-    const words = await extractWordsFromFile(base64, file.type, isPdf);
-    if (!words.length) return NextResponse.json({ words: [] });
+    const allWords = await extractWordsFromFile(base64, file.type, isPdf);
+    if (!allWords.length) return NextResponse.json({ words: [] });
 
+    const words = allWords.slice(0, MAX_WORDS_PER_UPLOAD);
     const generated = await generateWordBatch(words);
-    return NextResponse.json({ words: generated });
+    return NextResponse.json({ words: generated, foundCount: allWords.length, processedCount: words.length });
   } catch (e) {
     return handleApiError(e);
   }

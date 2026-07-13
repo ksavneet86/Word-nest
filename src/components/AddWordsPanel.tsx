@@ -37,6 +37,7 @@ export function AddWordsPanel({
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<(GeneratedWord & { _key: string })[]>([]);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [fileName, setFileName] = useState("");
   const [dragOver, setDragOver] = useState(false);
 
@@ -48,6 +49,7 @@ export function AddWordsPanel({
     if (!words.length) return;
     setLoading(true);
     setError("");
+    setNotice("");
     try {
       const res = await fetch("/api/words/generate", {
         method: "POST",
@@ -67,6 +69,7 @@ export function AddWordsPanel({
     setFileName(file.name);
     setLoading(true);
     setError("");
+    setNotice("");
     try {
       const upload = await compressImageForUpload(file);
       const formData = new FormData();
@@ -77,13 +80,22 @@ export function AddWordsPanel({
         setLoading(false);
         return;
       }
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      const words = data.words as GeneratedWord[];
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.error || "Couldn't read that file. Try a clearer image or PDF.");
+        setLoading(false);
+        return;
+      }
+      const words = (data.words ?? []) as GeneratedWord[];
       if (!words.length) {
         setError("No words found in that file.");
         setLoading(false);
         return;
+      }
+      if (typeof data.foundCount === "number" && typeof data.processedCount === "number" && data.foundCount > data.processedCount) {
+        setNotice(
+          `Found ${data.foundCount} words — added the first ${data.processedCount}. Upload the rest as a separate photo or file.`
+        );
       }
       setPreview(words.map((g) => ({ ...g, _key: uid() })));
     } catch {
@@ -184,6 +196,7 @@ export function AddWordsPanel({
               {loading && <p className="text-sm flex items-center gap-2 text-slate-500"><Loader2 className="animate-spin" size={16} /> Reading file &amp; generating meanings…</p>}
             </div>
           )}
+          {notice && <p className="text-sm text-amber-600 mt-2">{notice}</p>}
           {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
         </div>
       )}

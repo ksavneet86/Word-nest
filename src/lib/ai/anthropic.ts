@@ -17,15 +17,27 @@ function extractText(content: Anthropic.Messages.ContentBlock[]) {
     .join("\n");
 }
 
-async function callClaudeJSON<T>(system: string, content: Anthropic.Messages.MessageParam["content"]): Promise<T> {
+async function callClaudeJSON<T>(
+  system: string,
+  content: Anthropic.Messages.MessageParam["content"],
+  maxTokens = 1000
+): Promise<T> {
   const res = await client().messages.create({
     model: MODEL,
-    max_tokens: 1000,
+    max_tokens: maxTokens,
     system,
     messages: [{ role: "user", content }],
   });
   const text = extractText(res.content).replace(/```json|```/g, "").trim();
-  return JSON.parse(text) as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(
+      res.stop_reason === "max_tokens"
+        ? "The word list was too long to read in one go — try a smaller photo or a shorter section of the list."
+        : "Couldn't understand the AI's response — try again."
+    );
+  }
 }
 
 async function callClaudeText(system: string, content: Anthropic.Messages.MessageParam["content"]): Promise<string> {
@@ -84,7 +96,7 @@ export async function extractWordsFromFile(base64: string, mediaType: string, is
         { type: "image", source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: base64 } },
         { type: "text", text: "Extract the words." },
       ];
-  return callClaudeJSON<string[]>(EXTRACT_SYSTEM, content);
+  return callClaudeJSON<string[]>(EXTRACT_SYSTEM, content, 4096);
 }
 
 const FEEDBACK_SYSTEM =
