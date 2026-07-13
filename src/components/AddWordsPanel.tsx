@@ -35,11 +35,14 @@ export function AddWordsPanel({
   const [mode, setMode] = useState<"type" | "upload">("type");
   const [rawWords, setRawWords] = useState("");
   const [loading, setLoading] = useState(false);
+  const [generatingMore, setGeneratingMore] = useState(false);
   const [preview, setPreview] = useState<(GeneratedWord & { _key: string })[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [fileName, setFileName] = useState("");
   const [dragOver, setDragOver] = useState(false);
+
+  const CONTINUE_BATCH_SIZE = 40;
 
   const canGenerate = target.library && target.folder && target.list;
   const listId = canGenerate ? tree[target.library]?.folders[target.folder]?.lists[target.list]?.id : undefined;
@@ -63,6 +66,39 @@ export function AddWordsPanel({
       setError("Couldn't generate meanings. Try again.");
     }
     setLoading(false);
+  };
+
+  const generateRemaining = async (words: string[], doneSoFar: number, total: number) => {
+    if (!words.length) {
+      setNotice("");
+      setGeneratingMore(false);
+      return;
+    }
+    setGeneratingMore(true);
+    setNotice(`Generating meanings for the rest of the list… ${doneSoFar}/${total} words done`);
+    const batch = words.slice(0, CONTINUE_BATCH_SIZE);
+    const rest = words.slice(CONTINUE_BATCH_SIZE);
+    try {
+      const res = await fetch("/api/words/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ words: batch }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.error || "Couldn't generate meanings for the rest of the list — the words already found are still below.");
+        setNotice("");
+        setGeneratingMore(false);
+        return;
+      }
+      const generated = (data.words ?? []) as GeneratedWord[];
+      setPreview((prev) => [...prev, ...generated.map((g) => ({ ...g, _key: uid() }))]);
+      await generateRemaining(rest, doneSoFar + batch.length, total);
+    } catch {
+      setError("Couldn't generate meanings for the rest of the list — the words already found are still below.");
+      setNotice("");
+      setGeneratingMore(false);
+    }
   };
 
   const handleFile = async (file: File) => {
@@ -92,12 +128,19 @@ export function AddWordsPanel({
         setLoading(false);
         return;
       }
-      if (typeof data.foundCount === "number" && typeof data.processedCount === "number" && data.foundCount > data.processedCount) {
-        setNotice(
-          `Found ${data.foundCount} words — added the first ${data.processedCount}. Upload the rest as a separate photo or file.`
-        );
-      }
       setPreview(words.map((g) => ({ ...g, _key: uid() })));
+      setLoading(false);
+
+      if (
+        typeof data.foundCount === "number" &&
+        typeof data.processedCount === "number" &&
+        data.foundCount > data.processedCount &&
+        Array.isArray(data.allWords)
+      ) {
+        const leftover = data.allWords.slice(data.processedCount) as string[];
+        generateRemaining(leftover, data.processedCount, data.foundCount);
+      }
+      return;
     } catch {
       setError("Couldn't read that file. Try a clearer image or PDF.");
     }
@@ -196,7 +239,11 @@ export function AddWordsPanel({
               {loading && <p className="text-sm flex items-center gap-2 text-slate-500"><Loader2 className="animate-spin" size={16} /> Reading file &amp; generating meanings…</p>}
             </div>
           )}
-          {notice && <p className="text-sm text-amber-600 mt-2">{notice}</p>}
+          {notice && (
+            <p className="text-sm text-amber-600 mt-2 flex items-center gap-2">
+              {generatingMore && <Loader2 className="animate-spin" size={14} />} {notice}
+            </p>
+          )}
           {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
         </div>
       )}
@@ -215,6 +262,7 @@ export function AddWordsPanel({
             ))}
           </div>
           <Btn color={sectionColor} onClick={save}><Check size={16} /> Save {preview.length} words to {target.list}</Btn>
+          {generatingMore && <p className="text-xs text-slate-400">More words are still being added below — you can wait for all of them or save what&apos;s here now.</p>}
         </div>
       )}
     </div>
