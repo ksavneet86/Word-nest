@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Folder, FileText, Library as LibraryIcon, Pencil, Check, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Plus, Folder, FileText, Library as LibraryIcon, Check, Loader2 } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
 import type { SectionTree } from "@/lib/types";
 
@@ -13,6 +13,8 @@ export interface TreeSelection {
 
 type ItemKind = "library" | "folder" | "list";
 type EditTarget = { kind: ItemKind; name: string } | null;
+
+const LONG_PRESS_MS = 2200;
 
 export function LibraryPicker({
   tree,
@@ -45,6 +47,9 @@ export function LibraryPicker({
   const [editing, setEditing] = useState<EditTarget>(null);
   const [editValue, setEditValue] = useState("");
   const [renameError, setRenameError] = useState("");
+
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
 
   const folders = value.library && tree[value.library] ? Object.keys(tree[value.library].folders) : [];
   const lists =
@@ -129,11 +134,32 @@ export function LibraryPicker({
     }
   };
 
+  const handlePressStart = (kind: ItemKind, name: string) => {
+    longPressFired.current = false;
+    pressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      startEdit(kind, name);
+    }, LONG_PRESS_MS);
+  };
+  const handlePressEnd = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+  const handleClick = (onSelect: () => void) => {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    onSelect();
+  };
+
   const renderItem = (kind: ItemKind, name: string, isSelected: boolean, onSelect: () => void) => {
     const isEditing = editing?.kind === kind && editing.name === name;
     if (isEditing) {
       return (
-        <div key={`${kind}-${name}`} className="flex items-center gap-1">
+        <div key={`${kind}-${name}`} className="flex items-center gap-1.5 bg-slate-50 rounded-2xl p-1.5">
           <input
             autoFocus
             value={editValue}
@@ -142,27 +168,29 @@ export function LibraryPicker({
               if (e.key === "Enter") saveEdit();
               if (e.key === "Escape") cancelEdit();
             }}
-            className="px-2 py-1.5 rounded-xl text-sm border-2 w-32"
+            className="px-2 py-1.5 rounded-xl text-sm border-2 bg-white w-28"
             style={{ borderColor: sectionColor }}
           />
-          <button onClick={saveEdit} disabled={busy} className="text-green-600 min-w-[40px] min-h-[40px] flex items-center justify-center"><Check size={16} /></button>
-          <button onClick={cancelEdit} disabled={busy} className="text-slate-400 min-w-[40px] min-h-[40px] flex items-center justify-center"><X size={16} /></button>
+          <Btn color={sectionColor} onClick={saveEdit} disabled={busy} className="px-3 py-1.5 text-xs">
+            {busy ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />} Save
+          </Btn>
+          <button onClick={cancelEdit} disabled={busy} className="text-xs font-bold text-slate-400 px-2 min-h-[40px]">Cancel</button>
         </div>
       );
     }
     return (
-      <div key={`${kind}-${name}`} className="flex items-center gap-0.5">
-        <button
-          onClick={onSelect}
-          className="px-3 py-1.5 rounded-xl text-sm font-semibold border-2 min-h-[40px]"
-          style={{ borderColor: isSelected ? sectionColor : "#E5E7EB", color: isSelected ? sectionColor : "#475569" }}
-        >
-          {name}
-        </button>
-        <button onClick={() => startEdit(kind, name)} className="text-slate-300 hover:text-slate-500 min-w-[32px] min-h-[40px] flex items-center justify-center" title={`Rename ${kind}`}>
-          <Pencil size={13} />
-        </button>
-      </div>
+      <button
+        key={`${kind}-${name}`}
+        onClick={() => handleClick(onSelect)}
+        onPointerDown={() => handlePressStart(kind, name)}
+        onPointerUp={handlePressEnd}
+        onPointerLeave={handlePressEnd}
+        onPointerCancel={handlePressEnd}
+        className="px-3 py-1.5 rounded-xl text-sm font-semibold border-2 min-h-[40px] select-none"
+        style={{ borderColor: isSelected ? sectionColor : "#E5E7EB", color: isSelected ? sectionColor : "#475569" }}
+      >
+        {name}
+      </button>
     );
   };
 
@@ -224,6 +252,8 @@ export function LibraryPicker({
           </div>
         </div>
       )}
+
+      <p className="text-[11px] text-slate-400">Tip: press and hold a name for a couple of seconds to rename it.</p>
     </div>
   );
 }
