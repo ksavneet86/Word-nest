@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, FolderPlus, Loader2, PencilLine, Upload, Wand2 } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
 import { LibraryPicker, type TreeSelection } from "@/components/LibraryPicker";
@@ -47,12 +47,39 @@ export function AddWordsPanel({
   const canGenerate = target.library && target.folder && target.list;
   const listId = canGenerate ? tree[target.library]?.folders[target.folder]?.lists[target.list]?.id : undefined;
 
+  const seenWordsRef = useRef<Set<string>>(new Set());
+
+  const existingWordSet = () => {
+    const existing = new Set<string>();
+    const list =
+      target.library && target.folder && target.list
+        ? tree[target.library]?.folders[target.folder]?.lists[target.list]
+        : undefined;
+    list?.words.forEach((w) => existing.add(w.word.trim().toLowerCase()));
+    return existing;
+  };
+
+  /** Marks a raw word string as seen; returns false (and skips it) if it's a duplicate. */
+  const markIfNew = (word: string) => {
+    const key = word.trim().toLowerCase();
+    if (!key || seenWordsRef.current.has(key)) return false;
+    seenWordsRef.current.add(key);
+    return true;
+  };
+
   const generateFromTyped = async () => {
-    const words = rawWords.split(/[,\n]/).map((w) => w.trim()).filter(Boolean);
-    if (!words.length) return;
+    const typed = rawWords.split(/[,\n]/).map((w) => w.trim()).filter(Boolean);
+    if (!typed.length) return;
+    seenWordsRef.current = existingWordSet();
+    const words = typed.filter(markIfNew);
+    const skipped = typed.length - words.length;
+    if (!words.length) {
+      setError("All of those words are already in this list.");
+      return;
+    }
     setLoading(true);
     setError("");
-    setNotice("");
+    setNotice(skipped ? `Skipped ${skipped} word${skipped === 1 ? "" : "s"} already in this list.` : "");
     try {
       const res = await fetch("/api/words/generate", {
         method: "POST",
@@ -91,7 +118,7 @@ export function AddWordsPanel({
         setGeneratingMore(false);
         return;
       }
-      const generated = (data.words ?? []) as GeneratedWord[];
+      const generated = ((data.words ?? []) as GeneratedWord[]).filter((g) => markIfNew(g.word));
       setPreview((prev) => [...prev, ...generated.map((g) => ({ ...g, _key: uid() }))]);
       await generateRemaining(rest, doneSoFar + batch.length, total);
     } catch {
@@ -106,6 +133,7 @@ export function AddWordsPanel({
     setLoading(true);
     setError("");
     setNotice("");
+    seenWordsRef.current = existingWordSet();
     try {
       const upload = await compressImageForUpload(file);
       const formData = new FormData();
@@ -122,23 +150,34 @@ export function AddWordsPanel({
         setLoading(false);
         return;
       }
-      const words = (data.words ?? []) as GeneratedWord[];
-      if (!words.length) {
+      const rawGenerated = (data.words ?? []) as GeneratedWord[];
+      if (!rawGenerated.length) {
         setError("No words found in that file.");
         setLoading(false);
         return;
       }
+      const words = rawGenerated.filter((g) => markIfNew(g.word));
+      const skippedFirstBatch = rawGenerated.length - words.length;
       setPreview(words.map((g) => ({ ...g, _key: uid() })));
       setLoading(false);
 
+      let leftoverDeduped: string[] = [];
       if (
         typeof data.foundCount === "number" &&
         typeof data.processedCount === "number" &&
         data.foundCount > data.processedCount &&
         Array.isArray(data.allWords)
       ) {
-        const leftover = data.allWords.slice(data.processedCount) as string[];
-        generateRemaining(leftover, data.processedCount, data.foundCount);
+        const leftoverRaw = (data.allWords as string[]).slice(data.processedCount);
+        leftoverDeduped = leftoverRaw.filter(markIfNew);
+      }
+
+      if (leftoverDeduped.length) {
+        generateRemaining(leftoverDeduped, words.length, words.length + leftoverDeduped.length);
+      } else if (!words.length && skippedFirstBatch) {
+        setError("All the words found are already in this list.");
+      } else if (skippedFirstBatch) {
+        setNotice(`Skipped ${skippedFirstBatch} word${skippedFirstBatch === 1 ? "" : "s"} already in this list.`);
       }
       return;
     } catch {
