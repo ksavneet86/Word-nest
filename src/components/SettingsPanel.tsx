@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Settings2, X } from "lucide-react";
+import { Check, Loader2, Mail, Settings2, X } from "lucide-react";
 import { ToggleRow } from "@/components/ToggleRow";
 import { ShareModal } from "@/components/ShareModal";
 import { Btn } from "@/components/ui/Btn";
@@ -14,6 +14,8 @@ export function SettingsPanel({
   hasPin,
   onSetPin,
   learnerId,
+  learnerName,
+  onRenameLearner,
   isOwner,
 }: {
   settings: LearnerSettings;
@@ -22,11 +24,16 @@ export function SettingsPanel({
   hasPin: boolean;
   onSetPin: (pin: string | null) => Promise<void>;
   learnerId: string;
+  learnerName: string;
+  onRenameLearner: (name: string) => Promise<void>;
   isOwner: boolean;
 }) {
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
   const [showShare, setShowShare] = useState(false);
+  const [nameInput, setNameInput] = useState(learnerName);
+  const [nameError, setNameError] = useState("");
+  const [nameBusy, setNameBusy] = useState(false);
 
   const savePin = async () => {
     if (pinInput && !/^\d{4}$/.test(pinInput)) {
@@ -38,12 +45,48 @@ export function SettingsPanel({
     setPinInput("");
   };
 
+  const saveName = async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) {
+      setNameError("Name can't be empty");
+      return;
+    }
+    if (trimmed === learnerName) return;
+    setNameBusy(true);
+    setNameError("");
+    try {
+      await onRenameLearner(trimmed);
+    } catch (e) {
+      setNameError(e instanceof Error ? e.message : "Couldn't rename — try again.");
+    } finally {
+      setNameBusy(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2"><Settings2 size={18} /> Settings</h3>
           <button onClick={onClose} className="min-w-[40px] min-h-[40px] flex items-center justify-center"><X size={20} className="text-slate-400" /></button>
+        </div>
+
+        <div>
+          <label className="text-sm font-bold text-slate-700">Learner name</label>
+          <div className="flex gap-2 mt-2 items-start">
+            <div className="flex-1">
+              <input
+                value={nameInput}
+                onChange={(e) => { setNameInput(e.target.value); setNameError(""); }}
+                onKeyDown={(e) => e.key === "Enter" && saveName()}
+                className="w-full px-3 py-2 rounded-xl text-sm border-2 border-slate-200"
+              />
+              {nameError && <p className="text-xs text-red-500 mt-1">{nameError}</p>}
+            </div>
+            <Btn onClick={saveName} disabled={nameBusy || !nameInput.trim() || nameInput.trim() === learnerName} className="px-4 py-2 text-sm">
+              {nameBusy ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />} Save
+            </Btn>
+          </div>
         </div>
 
         <ToggleRow label="Reduce motion" desc="Turns off the bouncing animation on pictures." checked={settings.reduceMotion} onChange={(v) => onUpdate({ reduceMotion: v })} />

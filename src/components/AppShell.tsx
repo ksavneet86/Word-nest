@@ -90,6 +90,20 @@ export function AppShell() {
     setHasPin(data.hasPin);
   };
 
+  const renameLearner = async (name: string) => {
+    if (!activeId) return;
+    const res = await fetch(`/api/learners/${activeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Couldn't rename learner");
+    }
+    setLearners((prev) => prev?.map((l) => (l.id === activeId ? { ...l, name } : l)) ?? prev);
+  };
+
   const addLearner = async (name: string) => {
     const res = await fetch("/api/learners", {
       method: "POST",
@@ -177,6 +191,8 @@ export function AppShell() {
             hasPin={hasPin}
             onSetPin={setPin}
             learnerId={activeId}
+            learnerName={learners.find((l) => l.id === activeId)?.name ?? ""}
+            onRenameLearner={renameLearner}
             isOwner={isOwner}
           />
         )}
