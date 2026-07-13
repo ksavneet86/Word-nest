@@ -5,7 +5,7 @@ import { Check, FolderPlus, Loader2, PencilLine, Upload, Wand2 } from "lucide-re
 import { Btn } from "@/components/ui/Btn";
 import { LibraryPicker, type TreeSelection } from "@/components/LibraryPicker";
 import type { GeneratedWord, SectionTree } from "@/lib/types";
-import { uid } from "@/lib/client-helpers";
+import { uid, compressImageForUpload } from "@/lib/client-helpers";
 
 export function AddWordsPanel({
   tree,
@@ -62,9 +62,15 @@ export function AddWordsPanel({
     setLoading(true);
     setError("");
     try {
+      const upload = await compressImageForUpload(file);
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", upload);
       const res = await fetch("/api/words/extract", { method: "POST", body: formData });
+      if (res.status === 413) {
+        setError("That file is too large — try a smaller photo or a lower-resolution scan.");
+        setLoading(false);
+        return;
+      }
       if (!res.ok) throw new Error();
       const data = await res.json();
       const words = data.words as GeneratedWord[];
