@@ -243,8 +243,15 @@ export function LibraryPicker({
         onPointerUp={handlePressEnd}
         onPointerLeave={handlePressEnd}
         onPointerCancel={handlePressEnd}
+        onContextMenu={(e) => e.preventDefault()}
         className="px-3 py-1.5 rounded-xl text-sm font-semibold border-2 min-h-[40px] select-none"
-        style={{ borderColor: isSelected ? sectionColor : "#E5E7EB", color: isSelected ? sectionColor : "#475569" }}
+        style={{
+          borderColor: isSelected ? sectionColor : "#E5E7EB",
+          color: isSelected ? sectionColor : "#475569",
+          WebkitTouchCallout: "none",
+          WebkitUserSelect: "none",
+          touchAction: "manipulation",
+        }}
       >
         {name}
       </button>
