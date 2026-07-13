@@ -117,6 +117,49 @@ export function SectionView({
     await refetch();
   };
 
+  const renameLibrary = async (oldName: string, newName: string) => {
+    const libraryId = tree[oldName]?.id;
+    if (!libraryId) return;
+    const res = await fetch(`/api/tree/library/${libraryId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Couldn't rename library");
+    }
+    await refetch();
+  };
+  const renameFolder = async (oldName: string, newName: string) => {
+    const folderId = tree[selection.library]?.folders[oldName]?.id;
+    if (!folderId) return;
+    const res = await fetch(`/api/tree/folder/${folderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Couldn't rename folder");
+    }
+    await refetch();
+  };
+  const renameList = async (oldName: string, newName: string) => {
+    const listId = tree[selection.library]?.folders[selection.folder]?.lists[oldName]?.id;
+    if (!listId) return;
+    const res = await fetch(`/api/tree/list/${listId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Couldn't rename list");
+    }
+    await refetch();
+  };
+
   const saveWords = async (listId: string, target: TreeSelection, words: GeneratedWord[]) => {
     await fetch("/api/words", {
       method: "POST",
@@ -167,6 +210,9 @@ export function SectionView({
           onCreateLibrary={createLibrary}
           onCreateFolder={createFolder}
           onCreateList={createList}
+          onRenameLibrary={renameLibrary}
+          onRenameFolder={renameFolder}
+          onRenameList={renameList}
           onSave={saveWords}
         />
       )}
@@ -181,6 +227,9 @@ export function SectionView({
             onCreateLibrary={createLibrary}
             onCreateFolder={createFolder}
             onCreateList={createList}
+            onRenameLibrary={renameLibrary}
+            onRenameFolder={renameFolder}
+            onRenameList={renameList}
           />
         </div>
       )}

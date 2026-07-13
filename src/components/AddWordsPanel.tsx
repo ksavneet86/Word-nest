@@ -15,6 +15,9 @@ export function AddWordsPanel({
   onCreateLibrary,
   onCreateFolder,
   onCreateList,
+  onRenameLibrary,
+  onRenameFolder,
+  onRenameList,
   onSave,
 }: {
   tree: SectionTree;
@@ -24,6 +27,9 @@ export function AddWordsPanel({
   onCreateLibrary: (name: string) => Promise<void>;
   onCreateFolder: (name: string) => Promise<void>;
   onCreateList: (name: string) => Promise<void>;
+  onRenameLibrary: (oldName: string, newName: string) => Promise<void>;
+  onRenameFolder: (oldName: string, newName: string) => Promise<void>;
+  onRenameList: (oldName: string, newName: string) => Promise<void>;
   onSave: (listId: string, target: TreeSelection, words: GeneratedWord[]) => Promise<void>;
 }) {
   const [mode, setMode] = useState<"type" | "upload">("type");
@@ -105,6 +111,9 @@ export function AddWordsPanel({
           onCreateLibrary={onCreateLibrary}
           onCreateFolder={onCreateFolder}
           onCreateList={onCreateList}
+          onRenameLibrary={onRenameLibrary}
+          onRenameFolder={onRenameFolder}
+          onRenameList={onRenameList}
         />
       </div>
 
