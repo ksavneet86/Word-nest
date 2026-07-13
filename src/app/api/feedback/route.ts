@@ -4,7 +4,7 @@ import { handleApiError, BadRequestError } from "@/lib/server/api-utils";
 import { getLearnerOrThrow } from "@/lib/server/learners";
 import { getSectionTree } from "@/lib/server/tree";
 import { wordStatus } from "@/lib/server/srs";
-import { generateFeedback } from "@/lib/ai/anthropic";
+import { buildTemplatedFeedback } from "@/lib/server/feedback-template";
 import { prisma } from "@/lib/server/db";
 import { SECTIONS } from "@/lib/constants";
 import type { Section } from "@prisma/client";
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       take: 10,
     });
 
-    const reportText = await generateFeedback({
+    const reportText = buildTemplatedFeedback({
       lists: rows,
       recentSessions: recentSessions.map((s) => ({ type: s.type, correct: s.correct, total: s.total })),
       weakWords: weakWords.slice(0, 15),

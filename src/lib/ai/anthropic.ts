@@ -56,16 +56,6 @@ async function callClaudeJSON<T>(
   }
 }
 
-async function callClaudeText(system: string, content: Anthropic.Messages.MessageParam["content"]): Promise<string> {
-  const res = await createMessage({
-    model: MODEL,
-    max_tokens: 500,
-    system,
-    messages: [{ role: "user", content }],
-  });
-  return extractText(res.content).trim();
-}
-
 const GENERATE_SYSTEM =
   "You are a children's dictionary assistant. Return ONLY a JSON array, no prose, no markdown fences. " +
   "For each input word, produce an object with keys: " +
@@ -149,20 +139,4 @@ export async function extractWordsFromFile(base64: string, mediaType: string, is
         : "Couldn't understand the AI's response — try again."
     );
   }
-}
-
-const FEEDBACK_SYSTEM =
-  "You are a warm, encouraging learning coach writing a short progress note for a parent or teacher about a child's " +
-  "vocabulary practice. Write 100-150 words, plain language, no clinical or diagnostic terms. Mention 1-2 concrete " +
-  "strengths, 1-2 specific words or patterns to practice next, and one simple, practical suggestion for this week.";
-
-export interface FeedbackSummary {
-  lists: Array<{ list: string; total: number; mastered: number; needsPractice: number }>;
-  recentSessions: Array<{ type: string; correct: number; total: number }>;
-  weakWords: string[];
-}
-
-/** Ports the feedback report prompt verbatim from the reference artifact. */
-export async function generateFeedback(summary: FeedbackSummary): Promise<string> {
-  return callClaudeText(FEEDBACK_SYSTEM, [{ type: "text", text: JSON.stringify(summary) }]);
 }
