@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { fetchPictogramId } from "@/lib/arasaac";
 import type { GeneratedWord } from "@/lib/types";
+import { BadRequestError } from "@/lib/server/api-utils";
 
 const MODEL = "claude-sonnet-5";
 
@@ -17,13 +18,31 @@ function extractText(content: Anthropic.Messages.ContentBlock[]) {
     .join("\n");
 }
 
+/**
+ * Wraps client().messages.create() so a rejection from Claude's API (bad image data,
+ * unsupported format, etc.) becomes a BadRequestError with a message users actually see,
+ * instead of an unhandled exception that api-utils.ts flattens into "Something went wrong".
+ */
+async function createMessage(params: Anthropic.MessageCreateParamsNonStreaming) {
+  try {
+    return await client().messages.create(params);
+  } catch (e) {
+    console.error("[anthropic] request failed", e);
+    throw new BadRequestError(
+      e instanceof Anthropic.APIError && e.status === 400
+        ? "Couldn't read that file — try a different photo (JPEG, PNG, GIF, WEBP) or a PDF instead."
+        : "The AI service had trouble with that request — please try again in a moment."
+    );
+  }
+}
+
 async function callClaudeJSON<T>(
   system: string,
   content: Anthropic.Messages.MessageParam["content"],
   maxTokens = 1000,
   truncatedMessage = "That took too much to generate in one go — try again with fewer words."
 ): Promise<T> {
-  const res = await client().messages.create({
+  const res = await createMessage({
     model: MODEL,
     max_tokens: maxTokens,
     system,
@@ -33,12 +52,12 @@ async function callClaudeJSON<T>(
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error(res.stop_reason === "max_tokens" ? truncatedMessage : "Couldn't understand the AI's response — try again.");
+    throw new BadRequestError(res.stop_reason === "max_tokens" ? truncatedMessage : "Couldn't understand the AI's response — try again.");
   }
 }
 
 async function callClaudeText(system: string, content: Anthropic.Messages.MessageParam["content"]): Promise<string> {
-  const res = await client().messages.create({
+  const res = await createMessage({
     model: MODEL,
     max_tokens: 500,
     system,
@@ -110,7 +129,7 @@ export async function extractWordsFromFile(base64: string, mediaType: string, is
         { type: "text", text: "Extract the words." },
       ];
 
-  const res = await client().messages.create({
+  const res = await createMessage({
     model: MODEL,
     max_tokens: 8192,
     system: EXTRACT_SYSTEM,
@@ -124,7 +143,7 @@ export async function extractWordsFromFile(base64: string, mediaType: string, is
     // already emitted before the truncation point instead of failing outright.
     const salvaged = [...text.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
     if (salvaged.length) return salvaged;
-    throw new Error(
+    throw new BadRequestError(
       res.stop_reason === "max_tokens"
         ? "The word list was too long to read in one go — try a smaller photo or a shorter section of the list."
         : "Couldn't understand the AI's response — try again."

@@ -9,6 +9,7 @@ import { extractWordsFromFile, generateWordBatch } from "@/lib/ai/anthropic";
 export const maxDuration = 300;
 
 const MAX_TOTAL_WORDS = 300; // hard cap on words considered from one upload, to bound AI cost
+const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +17,14 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get("file");
     if (!(file instanceof File)) throw new BadRequestError("A file is required");
+
+    const isPdf = file.type === "application/pdf";
+    if (!isPdf && !SUPPORTED_IMAGE_TYPES.includes(file.type)) {
+      throw new BadRequestError(
+        "That image format isn't supported yet — please use a JPEG, PNG, GIF or WEBP photo, or a PDF. " +
+          "Some phones save camera photos as HEIC by default; switch your camera's format to \"Most Compatible\" (JPEG) or take a screenshot instead."
+      );
+    }
 
     let existingWords = new Set<string>();
     const existingRaw = formData.get("existingWords");
@@ -28,7 +37,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const isPdf = file.type === "application/pdf";
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = buffer.toString("base64");
 
