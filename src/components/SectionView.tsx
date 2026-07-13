@@ -160,6 +160,40 @@ export function SectionView({
     await refetch();
   };
 
+  const deleteLibrary = async (name: string) => {
+    const libraryId = tree[name]?.id;
+    if (!libraryId) return;
+    const res = await fetch(`/api/tree/library/${libraryId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Couldn't delete library");
+    }
+    if (selection.library === name) setSelection({ library: "", folder: "", list: "" });
+    await refetch();
+  };
+  const deleteFolder = async (name: string) => {
+    const folderId = tree[selection.library]?.folders[name]?.id;
+    if (!folderId) return;
+    const res = await fetch(`/api/tree/folder/${folderId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Couldn't delete folder");
+    }
+    if (selection.folder === name) setSelection({ ...selection, folder: "", list: "" });
+    await refetch();
+  };
+  const deleteList = async (name: string) => {
+    const listId = tree[selection.library]?.folders[selection.folder]?.lists[name]?.id;
+    if (!listId) return;
+    const res = await fetch(`/api/tree/list/${listId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Couldn't delete list");
+    }
+    if (selection.list === name) setSelection({ ...selection, list: "" });
+    await refetch();
+  };
+
   const saveWords = async (listId: string, target: TreeSelection, words: GeneratedWord[]) => {
     await fetch("/api/words", {
       method: "POST",
@@ -213,6 +247,9 @@ export function SectionView({
           onRenameLibrary={renameLibrary}
           onRenameFolder={renameFolder}
           onRenameList={renameList}
+          onDeleteLibrary={deleteLibrary}
+          onDeleteFolder={deleteFolder}
+          onDeleteList={deleteList}
           onSave={saveWords}
         />
       )}
@@ -230,6 +267,9 @@ export function SectionView({
             onRenameLibrary={renameLibrary}
             onRenameFolder={renameFolder}
             onRenameList={renameList}
+            onDeleteLibrary={deleteLibrary}
+            onDeleteFolder={deleteFolder}
+            onDeleteList={deleteList}
           />
         </div>
       )}

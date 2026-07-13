@@ -29,3 +29,21 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     return handleApiError(e);
   }
 }
+
+export async function DELETE(_request: NextRequest, ctx: Ctx) {
+  try {
+    const user = await requireUser();
+    const { id } = await ctx.params;
+    await assertLibraryOwnership(id, user);
+
+    const folderCount = await prisma.folder.count({ where: { libraryId: id } });
+    if (folderCount > 0) {
+      throw new BadRequestError("Delete all folders inside this library first.");
+    }
+
+    await prisma.library.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return handleApiError(e);
+  }
+}

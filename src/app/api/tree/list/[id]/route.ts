@@ -29,3 +29,21 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     return handleApiError(e);
   }
 }
+
+export async function DELETE(_request: NextRequest, ctx: Ctx) {
+  try {
+    const user = await requireUser();
+    const { id } = await ctx.params;
+    await assertListOwnership(id, user);
+
+    const wordCount = await prisma.word.count({ where: { wordListId: id } });
+    if (wordCount > 0) {
+      throw new BadRequestError("Remove all words from this list first.");
+    }
+
+    await prisma.wordList.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return handleApiError(e);
+  }
+}

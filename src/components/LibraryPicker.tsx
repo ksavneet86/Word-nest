@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Folder, FileText, Library as LibraryIcon, Check, Loader2 } from "lucide-react";
+import { Plus, Folder, FileText, Library as LibraryIcon, Check, Loader2, Trash2 } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
 import type { SectionTree } from "@/lib/types";
 
@@ -27,6 +27,9 @@ export function LibraryPicker({
   onRenameLibrary,
   onRenameFolder,
   onRenameList,
+  onDeleteLibrary,
+  onDeleteFolder,
+  onDeleteList,
 }: {
   tree: SectionTree;
   sectionColor: string;
@@ -38,6 +41,9 @@ export function LibraryPicker({
   onRenameLibrary: (oldName: string, newName: string) => Promise<void>;
   onRenameFolder: (oldName: string, newName: string) => Promise<void>;
   onRenameList: (oldName: string, newName: string) => Promise<void>;
+  onDeleteLibrary: (name: string) => Promise<void>;
+  onDeleteFolder: (name: string) => Promise<void>;
+  onDeleteList: (name: string) => Promise<void>;
 }) {
   const libs = Object.keys(tree);
   const [newLib, setNewLib] = useState("");
@@ -47,6 +53,8 @@ export function LibraryPicker({
   const [editing, setEditing] = useState<EditTarget>(null);
   const [editValue, setEditValue] = useState("");
   const [renameError, setRenameError] = useState("");
+  const [deleting, setDeleting] = useState<EditTarget>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFired = useRef(false);
@@ -134,6 +142,35 @@ export function LibraryPicker({
     }
   };
 
+  const startDelete = (kind: ItemKind, name: string) => {
+    setDeleting({ kind, name });
+    setDeleteError("");
+  };
+  const cancelDelete = () => {
+    setDeleting(null);
+    setDeleteError("");
+  };
+  const confirmDelete = async () => {
+    if (!deleting || busy) return;
+    setBusy(true);
+    setDeleteError("");
+    try {
+      if (deleting.kind === "library") {
+        await onDeleteLibrary(deleting.name);
+      } else if (deleting.kind === "folder") {
+        await onDeleteFolder(deleting.name);
+      } else {
+        await onDeleteList(deleting.name);
+      }
+      setDeleting(null);
+      setEditing(null);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Couldn't delete — try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handlePressStart = (kind: ItemKind, name: string) => {
     longPressFired.current = false;
     pressTimer.current = setTimeout(() => {
@@ -157,6 +194,23 @@ export function LibraryPicker({
 
   const renderItem = (kind: ItemKind, name: string, isSelected: boolean, onSelect: () => void) => {
     const isEditing = editing?.kind === kind && editing.name === name;
+    const isDeleting = deleting?.kind === kind && deleting.name === name;
+
+    if (isDeleting) {
+      return (
+        <div key={`${kind}-${name}`} className="flex flex-col gap-1.5 bg-red-50 rounded-2xl p-2">
+          <p className="text-xs font-semibold text-red-600">Delete &quot;{name}&quot;? This can&apos;t be undone.</p>
+          {deleteError && <p className="text-xs text-red-500">{deleteError}</p>}
+          <div className="flex items-center gap-1.5">
+            <Btn variant="solid" color="#DC2626" onClick={confirmDelete} disabled={busy} className="px-3 py-1.5 text-xs">
+              {busy ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />} Delete
+            </Btn>
+            <button onClick={cancelDelete} disabled={busy} className="text-xs font-bold text-slate-400 px-2 min-h-[40px]">Cancel</button>
+          </div>
+        </div>
+      );
+    }
+
     if (isEditing) {
       return (
         <div key={`${kind}-${name}`} className="flex items-center gap-1.5 bg-slate-50 rounded-2xl p-1.5">
@@ -175,6 +229,9 @@ export function LibraryPicker({
             {busy ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />} Save
           </Btn>
           <button onClick={cancelEdit} disabled={busy} className="text-xs font-bold text-slate-400 px-2 min-h-[40px]">Cancel</button>
+          <button onClick={() => startDelete(kind, name)} disabled={busy} className="text-red-400 px-2 min-w-[40px] min-h-[40px] flex items-center justify-center" title="Delete">
+            <Trash2 size={14} />
+          </button>
         </div>
       );
     }
@@ -253,7 +310,7 @@ export function LibraryPicker({
         </div>
       )}
 
-      <p className="text-[11px] text-slate-400">Tip: press and hold a name for a couple of seconds to rename it.</p>
+      <p className="text-[11px] text-slate-400">Tip: press and hold a name for a couple of seconds to rename or delete it.</p>
     </div>
   );
 }
