@@ -234,6 +234,54 @@ export function SectionView({
     }
   };
 
+  const reorderItem = async (kind: "library" | "folder" | "list", name: string, direction: "earlier" | "later") => {
+    if (kind === "library") {
+      const names = Object.keys(tree);
+      const idx = names.indexOf(name);
+      const swapIdx = direction === "earlier" ? idx - 1 : idx + 1;
+      if (idx === -1 || swapIdx < 0 || swapIdx >= names.length) return;
+      const reordered = [...names];
+      [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+      const orderedIds = reordered.map((n) => tree[n].id);
+      await fetch("/api/tree/library/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ learnerId, section: sectionKey, orderedIds }),
+      });
+    } else if (kind === "folder") {
+      const library = tree[selection.library];
+      if (!library) return;
+      const names = Object.keys(library.folders);
+      const idx = names.indexOf(name);
+      const swapIdx = direction === "earlier" ? idx - 1 : idx + 1;
+      if (idx === -1 || swapIdx < 0 || swapIdx >= names.length) return;
+      const reordered = [...names];
+      [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+      const orderedIds = reordered.map((n) => library.folders[n].id);
+      await fetch("/api/tree/folder/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ libraryId: library.id, orderedIds }),
+      });
+    } else {
+      const folder = tree[selection.library]?.folders[selection.folder];
+      if (!folder) return;
+      const names = Object.keys(folder.lists);
+      const idx = names.indexOf(name);
+      const swapIdx = direction === "earlier" ? idx - 1 : idx + 1;
+      if (idx === -1 || swapIdx < 0 || swapIdx >= names.length) return;
+      const reordered = [...names];
+      [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+      const orderedIds = reordered.map((n) => folder.lists[n].id);
+      await fetch("/api/tree/list/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderId: folder.id, orderedIds }),
+      });
+    }
+    await refetch();
+  };
+
   const saveWords = async (listId: string, target: TreeSelection, words: GeneratedWord[]) => {
     await fetch("/api/words", {
       method: "POST",
@@ -327,6 +375,7 @@ export function SectionView({
           onDeleteFolder={deleteFolder}
           onDeleteList={deleteList}
           onRequestMove={requestMove}
+          onReorder={reorderItem}
           onSave={saveWords}
         />
       )}
@@ -348,6 +397,7 @@ export function SectionView({
             onDeleteFolder={deleteFolder}
             onDeleteList={deleteList}
             onRequestMove={requestMove}
+            onReorder={reorderItem}
           />
         </div>
       )}
@@ -435,10 +485,11 @@ export function SectionView({
               )}
 
               <div className="space-y-3">
-                {filteredWords.map((w) => (
+                {filteredWords.map((w, i) => (
                   <WordDetailCard
                     key={w.id}
                     w={w}
+                    number={i + 1}
                     color={meta.color}
                     showSpellingMode={sectionKey === "spelling"}
                     onDelete={() => deleteWord(w.id)}

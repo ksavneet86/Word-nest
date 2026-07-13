@@ -96,6 +96,7 @@ model Library {
   learnerProfile   LearnerProfile @relation(fields: [learnerProfileId], references: [id], onDelete: Cascade)
   section          Section
   name             String
+  order            Int      @default(0)
   createdAt        DateTime @default(now())
 
   folders Folder[]
@@ -109,6 +110,7 @@ model Folder {
   libraryId String
   library   Library  @relation(fields: [libraryId], references: [id], onDelete: Cascade)
   name      String
+  order     Int      @default(0)
   createdAt DateTime @default(now())
 
   wordLists WordList[]
@@ -121,6 +123,7 @@ model WordList {
   folderId  String
   folder    Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
   name      String
+  order     Int      @default(0)
   createdAt DateTime @default(now())
 
   words Word[]

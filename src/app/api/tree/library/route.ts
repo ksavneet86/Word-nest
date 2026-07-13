@@ -16,10 +16,15 @@ export async function POST(request: NextRequest) {
     }
     await getLearnerOrThrow(learnerId, user);
 
+    const { _max } = await prisma.library.aggregate({
+      where: { learnerProfileId: learnerId, section: section as Section },
+      _max: { order: true },
+    });
+
     const library = await prisma.library.upsert({
       where: { learnerProfileId_section_name: { learnerProfileId: learnerId, section: section as Section, name: trimmed } },
       update: {},
-      create: { learnerProfileId: learnerId, section: section as Section, name: trimmed },
+      create: { learnerProfileId: learnerId, section: section as Section, name: trimmed, order: (_max.order ?? -1) + 1 },
     });
     return NextResponse.json({ library: { id: library.id, name: library.name } });
   } catch (e) {

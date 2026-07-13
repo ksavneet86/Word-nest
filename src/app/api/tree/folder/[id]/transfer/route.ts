@@ -19,10 +19,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     }
 
     const folder = await assertFolderOwnership(id, user);
-    const targetLibrary = await assertLibraryOwnership(targetLibraryId, user);
-    if (targetLibrary.section !== folder.library.section) {
-      throw new BadRequestError("You can only move or copy within the same section");
-    }
+    await assertLibraryOwnership(targetLibraryId, user);
 
     if (mode === "move") {
       try {

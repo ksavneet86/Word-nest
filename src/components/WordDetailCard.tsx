@@ -19,6 +19,7 @@ export function WordDetailCard({
   selectMode,
   selected,
   onToggleSelect,
+  number,
 }: {
   w: WordRecord;
   color: string;
@@ -27,6 +28,7 @@ export function WordDetailCard({
   selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
+  number?: number;
 }) {
   const [showSyn, setShowSyn] = useState(false);
   const { speechRate } = useSettings();
@@ -38,6 +40,11 @@ export function WordDetailCard({
     <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-4">
+          {typeof number === "number" && (
+            <span className="shrink-0 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center" style={{ backgroundColor: `${color}15`, color }}>
+              {number}
+            </span>
+          )}
           {selectMode && (
             <input
               type="checkbox"

@@ -12,10 +12,12 @@ export async function POST(request: NextRequest) {
     if (!folderId || !trimmed) throw new BadRequestError("folderId and a name are required");
     await assertFolderOwnership(folderId, user);
 
+    const { _max } = await prisma.wordList.aggregate({ where: { folderId }, _max: { order: true } });
+
     const list = await prisma.wordList.upsert({
       where: { folderId_name: { folderId, name: trimmed } },
       update: {},
-      create: { folderId, name: trimmed },
+      create: { folderId, name: trimmed, order: (_max.order ?? -1) + 1 },
     });
     return NextResponse.json({ list: { id: list.id, name: list.name } });
   } catch (e) {

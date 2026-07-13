@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Folder, FileText, Library as LibraryIcon, Check, Loader2, Trash2, PencilLine, ArrowRightLeft } from "lucide-react";
+import { Plus, Folder, FileText, Library as LibraryIcon, Check, Loader2, Trash2, PencilLine, ArrowRightLeft, ArrowLeft, ArrowRight } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
 import type { SectionTree } from "@/lib/types";
 
@@ -31,6 +31,7 @@ export function LibraryPicker({
   onDeleteFolder,
   onDeleteList,
   onRequestMove,
+  onReorder,
 }: {
   tree: SectionTree;
   sectionColor: string;
@@ -46,6 +47,7 @@ export function LibraryPicker({
   onDeleteFolder: (name: string) => Promise<void>;
   onDeleteList: (name: string) => Promise<void>;
   onRequestMove: (kind: ItemKind, name: string) => void;
+  onReorder: (kind: ItemKind, name: string, direction: "earlier" | "later") => void;
 }) {
   const libs = Object.keys(tree);
   const [newLib, setNewLib] = useState("");
@@ -205,9 +207,31 @@ export function LibraryPicker({
     const isDeleting = deleting?.kind === kind && deleting.name === name;
 
     if (isMenuOpen) {
+      const siblings = kind === "library" ? libs : kind === "folder" ? folders : lists;
+      const idx = siblings.indexOf(name);
+      const canEarlier = idx > 0;
+      const canLater = idx >= 0 && idx < siblings.length - 1;
       return (
         <div key={`${kind}-${name}`} className="flex items-center gap-1.5 bg-slate-50 rounded-2xl p-1.5 flex-wrap">
           <span className="text-xs font-semibold text-slate-500 px-1">{name}</span>
+          <button
+            onClick={() => onReorder(kind, name, "earlier")}
+            disabled={!canEarlier}
+            title="Move earlier"
+            className="p-1.5 rounded-xl min-w-[40px] min-h-[40px] flex items-center justify-center disabled:opacity-30"
+            style={{ color: sectionColor, backgroundColor: `${sectionColor}1a` }}
+          >
+            <ArrowLeft size={14} />
+          </button>
+          <button
+            onClick={() => onReorder(kind, name, "later")}
+            disabled={!canLater}
+            title="Move later"
+            className="p-1.5 rounded-xl min-w-[40px] min-h-[40px] flex items-center justify-center disabled:opacity-30"
+            style={{ color: sectionColor, backgroundColor: `${sectionColor}1a` }}
+          >
+            <ArrowRight size={14} />
+          </button>
           <button onClick={() => startEdit(kind, name)} className="text-xs font-bold px-2 py-1.5 rounded-xl flex items-center gap-1 min-h-[40px]" style={{ color: sectionColor, backgroundColor: `${sectionColor}1a` }}>
             <PencilLine size={13} /> Rename
           </button>
@@ -344,7 +368,7 @@ export function LibraryPicker({
         </div>
       )}
 
-      <p className="text-[11px] text-slate-400">Tip: press and hold a name for a couple of seconds for rename, move/copy, and delete options.</p>
+      <p className="text-[11px] text-slate-400">Tip: press and hold a name for a couple of seconds for reorder, rename, move/copy, and delete options.</p>
     </div>
   );
 }

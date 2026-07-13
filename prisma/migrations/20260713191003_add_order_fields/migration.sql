@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Folder" ADD COLUMN     "order" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "Library" ADD COLUMN     "order" INTEGER NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "WordList" ADD COLUMN     "order" INTEGER NOT NULL DEFAULT 0;

@@ -61,10 +61,13 @@ export async function assertWordOwnership(wordId: string, user: CurrentUser) {
 export async function getSectionTree(learnerProfileId: string, section: Section): Promise<SectionTree> {
   const libraries = await prisma.library.findMany({
     where: { learnerProfileId, section },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     include: {
       folders: {
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
         include: {
           wordLists: {
+            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
             include: { words: { orderBy: { addedAt: "asc" } } },
           },
         },

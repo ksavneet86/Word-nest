@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowRightLeft, Copy, Loader2, X } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
 import type { LearnerSummary, SectionTree } from "@/lib/types";
-import type { SectionKey } from "@/lib/constants";
+import { SECTIONS, type SectionKey } from "@/lib/constants";
 
 type ItemKind = "library" | "folder" | "list";
 
@@ -33,6 +33,7 @@ export function MoveCopyModal({
 }) {
   const [learners, setLearners] = useState<LearnerSummary[] | null>(null);
   const [targetLearnerId, setTargetLearnerId] = useState("");
+  const [targetSection, setTargetSection] = useState<SectionKey>(sectionKey);
   const [targetTree, setTargetTree] = useState<SectionTree | null>(null);
   const [libraryName, setLibraryName] = useState(kind !== "library" ? suggestedLibraryName : "");
   const [folderName, setFolderName] = useState(kind === "list" ? suggestedFolderName : "");
@@ -43,17 +44,17 @@ export function MoveCopyModal({
   useEffect(() => {
     fetch("/api/learners")
       .then((r) => r.json())
-      .then((data) => setLearners((data.learners as LearnerSummary[]).filter((l) => l.id !== currentLearnerId)))
+      .then((data) => setLearners(data.learners as LearnerSummary[]))
       .catch(() => setLearners([]));
-  }, [currentLearnerId]);
+  }, []);
 
   useEffect(() => {
     if (!targetLearnerId || kind === "library") return;
-    fetch(`/api/tree?learnerId=${targetLearnerId}&section=${sectionKey}`)
+    fetch(`/api/tree?learnerId=${targetLearnerId}&section=${targetSection}`)
       .then((r) => r.json())
       .then((data) => setTargetTree(data.tree))
       .catch(() => setTargetTree(null));
-  }, [targetLearnerId, kind, sectionKey]);
+  }, [targetLearnerId, kind, targetSection]);
 
   const existingLibraryNames = targetTree ? Object.keys(targetTree) : [];
   const existingFolderNames =
@@ -80,7 +81,7 @@ export function MoveCopyModal({
         const libRes = await fetch("/api/tree/library", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ learnerId: targetLearnerId, section: sectionKey, name: libraryName.trim() }),
+          body: JSON.stringify({ learnerId: targetLearnerId, section: targetSection, name: libraryName.trim() }),
         });
         if (!libRes.ok) throw new Error((await libRes.json().catch(() => ({}))).error || "Couldn't set up the destination library");
         const { library } = await libRes.json();
@@ -94,7 +95,7 @@ export function MoveCopyModal({
         const libRes = await fetch("/api/tree/library", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ learnerId: targetLearnerId, section: sectionKey, name: libraryName.trim() }),
+          body: JSON.stringify({ learnerId: targetLearnerId, section: targetSection, name: libraryName.trim() }),
         });
         if (!libRes.ok) throw new Error((await libRes.json().catch(() => ({}))).error || "Couldn't set up the destination library");
         const { library } = await libRes.json();
@@ -143,16 +144,14 @@ export function MoveCopyModal({
         </div>
         <p className="text-xs text-slate-400">
           {mode === "move"
-            ? `This ${kindLabel} (and everything inside it) will be moved and no longer appear for the current learner.`
-            : `A copy of this ${kindLabel} (and everything inside it) will be created for the other learner — the original stays here.`}
+            ? `This ${kindLabel} (and everything inside it) will be moved to the destination below and no longer appear here.`
+            : `A copy of this ${kindLabel} (and everything inside it) will be created at the destination below — the original stays here.`}
         </p>
 
         <div>
           <label className="text-sm font-bold text-slate-700">Send to learner</label>
           {learners === null ? (
             <p className="text-sm text-slate-400 flex items-center gap-2 mt-2"><Loader2 className="animate-spin" size={14} /> Loading learners…</p>
-          ) : learners.length === 0 ? (
-            <p className="text-sm text-slate-400 mt-2">No other learners to send this to yet.</p>
           ) : (
             <div className="flex gap-2 mt-2 flex-wrap">
               {learners.map((l) => (
@@ -163,11 +162,30 @@ export function MoveCopyModal({
                   style={{ borderColor: targetLearnerId === l.id ? sectionColor : "#E5E7EB", color: targetLearnerId === l.id ? sectionColor : "#475569" }}
                 >
                   {l.avatarEmoji ? `${l.avatarEmoji} ` : ""}{l.name}
+                  {l.id === currentLearnerId ? " (this learner)" : ""}
                 </button>
               ))}
             </div>
           )}
         </div>
+
+        {targetLearnerId && kind !== "library" && (
+          <div>
+            <label className="text-sm font-bold text-slate-700">Section</label>
+            <div className="flex gap-2 mt-2 flex-wrap">
+              {(Object.entries(SECTIONS) as [SectionKey, (typeof SECTIONS)[SectionKey]][]).map(([key, secMeta]) => (
+                <button
+                  key={key}
+                  onClick={() => setTargetSection(key)}
+                  className="px-3 py-1.5 rounded-xl text-sm font-semibold border-2 min-h-[40px]"
+                  style={{ borderColor: targetSection === key ? sectionColor : "#E5E7EB", color: targetSection === key ? sectionColor : "#475569" }}
+                >
+                  {secMeta.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {targetLearnerId && kind !== "library" && (
           <div>

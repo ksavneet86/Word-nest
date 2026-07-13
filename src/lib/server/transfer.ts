@@ -49,8 +49,9 @@ async function cloneWords(sourceListId: string, targetListId: string) {
 
 export async function cloneListInto(sourceListId: string, targetFolderId: string) {
   const source = await prisma.wordList.findUniqueOrThrow({ where: { id: sourceListId } });
+  const { _max } = await prisma.wordList.aggregate({ where: { folderId: targetFolderId }, _max: { order: true } });
   const created = await createWithNameRetry(
-    (name) => prisma.wordList.create({ data: { folderId: targetFolderId, name } }),
+    (name) => prisma.wordList.create({ data: { folderId: targetFolderId, name, order: (_max.order ?? -1) + 1 } }),
     source.name
   );
   await cloneWords(sourceListId, created.id);
@@ -59,8 +60,9 @@ export async function cloneListInto(sourceListId: string, targetFolderId: string
 
 export async function cloneFolderInto(sourceFolderId: string, targetLibraryId: string) {
   const source = await prisma.folder.findUniqueOrThrow({ where: { id: sourceFolderId }, include: { wordLists: true } });
+  const { _max } = await prisma.folder.aggregate({ where: { libraryId: targetLibraryId }, _max: { order: true } });
   const created = await createWithNameRetry(
-    (name) => prisma.folder.create({ data: { libraryId: targetLibraryId, name } }),
+    (name) => prisma.folder.create({ data: { libraryId: targetLibraryId, name, order: (_max.order ?? -1) + 1 } }),
     source.name
   );
   for (const list of source.wordLists) {
@@ -71,8 +73,15 @@ export async function cloneFolderInto(sourceFolderId: string, targetLibraryId: s
 
 export async function cloneLibraryInto(sourceLibraryId: string, targetLearnerId: string) {
   const source = await prisma.library.findUniqueOrThrow({ where: { id: sourceLibraryId }, include: { folders: true } });
+  const { _max } = await prisma.library.aggregate({
+    where: { learnerProfileId: targetLearnerId, section: source.section },
+    _max: { order: true },
+  });
   const created = await createWithNameRetry(
-    (name) => prisma.library.create({ data: { learnerProfileId: targetLearnerId, section: source.section, name } }),
+    (name) =>
+      prisma.library.create({
+        data: { learnerProfileId: targetLearnerId, section: source.section, name, order: (_max.order ?? -1) + 1 },
+      }),
     source.name
   );
   for (const folder of source.folders) {

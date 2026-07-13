@@ -12,10 +12,12 @@ export async function POST(request: NextRequest) {
     if (!libraryId || !trimmed) throw new BadRequestError("libraryId and a name are required");
     await assertLibraryOwnership(libraryId, user);
 
+    const { _max } = await prisma.folder.aggregate({ where: { libraryId }, _max: { order: true } });
+
     const folder = await prisma.folder.upsert({
       where: { libraryId_name: { libraryId, name: trimmed } },
       update: {},
-      create: { libraryId, name: trimmed },
+      create: { libraryId, name: trimmed, order: (_max.order ?? -1) + 1 },
     });
     return NextResponse.json({ folder: { id: folder.id, name: folder.name } });
   } catch (e) {
