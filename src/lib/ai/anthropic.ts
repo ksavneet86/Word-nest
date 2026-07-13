@@ -20,7 +20,8 @@ function extractText(content: Anthropic.Messages.ContentBlock[]) {
 async function callClaudeJSON<T>(
   system: string,
   content: Anthropic.Messages.MessageParam["content"],
-  maxTokens = 1000
+  maxTokens = 1000,
+  truncatedMessage = "That took too much to generate in one go — try again with fewer words."
 ): Promise<T> {
   const res = await client().messages.create({
     model: MODEL,
@@ -32,11 +33,7 @@ async function callClaudeJSON<T>(
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error(
-      res.stop_reason === "max_tokens"
-        ? "The word list was too long to read in one go — try a smaller photo or a shorter section of the list."
-        : "Couldn't understand the AI's response — try again."
-    );
+    throw new Error(res.stop_reason === "max_tokens" ? truncatedMessage : "Couldn't understand the AI's response — try again.");
   }
 }
 
@@ -71,9 +68,12 @@ export async function generateWordBatch(words: string[]): Promise<GeneratedWord[
   const results: GeneratedWord[] = [];
   for (let i = 0; i < words.length; i += 3) {
     const chunk = words.slice(i, i + 3);
-    const parsed = await callClaudeJSON<GeneratedWord[]>(GENERATE_SYSTEM, [
-      { type: "text", text: `Words: ${JSON.stringify(chunk)}` },
-    ]);
+    const parsed = await callClaudeJSON<GeneratedWord[]>(
+      GENERATE_SYSTEM,
+      [{ type: "text", text: `Words: ${JSON.stringify(chunk)}` }],
+      4096,
+      "Some of these words needed too much detail to generate at once — try uploading a smaller batch."
+    );
     const withPics = await Promise.all(
       parsed.map(async (w) => ({ ...w, pictogramId: await fetchPictogramId(w.word) }))
     );
