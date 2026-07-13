@@ -201,7 +201,7 @@ export function LibraryPicker({
     onSelect();
   };
 
-  const renderItem = (kind: ItemKind, name: string, isSelected: boolean, onSelect: () => void) => {
+  const renderItem = (kind: ItemKind, name: string, isSelected: boolean, onSelect: () => void, label: string = name) => {
     const isMenuOpen = menu?.kind === kind && menu.name === name;
     const isEditing = editing?.kind === kind && editing.name === name;
     const isDeleting = deleting?.kind === kind && deleting.name === name;
@@ -304,7 +304,7 @@ export function LibraryPicker({
           touchAction: "manipulation",
         }}
       >
-        {name}
+        {label}
       </button>
     );
   };
@@ -353,7 +353,10 @@ export function LibraryPicker({
         <div>
           <label className="text-xs font-bold uppercase tracking-wide text-slate-500 flex items-center gap-1"><FileText size={13} /> List / File</label>
           <div className="flex gap-2 mt-1 flex-wrap items-center">
-            {lists.map((ls) => renderItem("list", ls, value.list === ls, () => onChange({ ...value, list: ls })))}
+            {lists.map((ls) => {
+              const wordCount = tree[value.library]?.folders[value.folder]?.lists[ls]?.words.length ?? 0;
+              return renderItem("list", ls, value.list === ls, () => onChange({ ...value, list: ls }), `${ls} (${wordCount})`);
+            })}
             <div className="flex gap-1">
               <input
                 value={newList}
