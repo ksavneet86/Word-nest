@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Plus, Folder, FileText, Library as LibraryIcon, Check, Loader2, Trash2 } from "lucide-react";
+import { Plus, Folder, FileText, Library as LibraryIcon, Check, Loader2, Trash2, PencilLine, ArrowRightLeft } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
 import type { SectionTree } from "@/lib/types";
 
@@ -30,6 +30,7 @@ export function LibraryPicker({
   onDeleteLibrary,
   onDeleteFolder,
   onDeleteList,
+  onRequestMove,
 }: {
   tree: SectionTree;
   sectionColor: string;
@@ -44,12 +45,14 @@ export function LibraryPicker({
   onDeleteLibrary: (name: string) => Promise<void>;
   onDeleteFolder: (name: string) => Promise<void>;
   onDeleteList: (name: string) => Promise<void>;
+  onRequestMove: (kind: ItemKind, name: string) => void;
 }) {
   const libs = Object.keys(tree);
   const [newLib, setNewLib] = useState("");
   const [newFolder, setNewFolder] = useState("");
   const [newList, setNewList] = useState("");
   const [busy, setBusy] = useState(false);
+  const [menu, setMenu] = useState<EditTarget>(null);
   const [editing, setEditing] = useState<EditTarget>(null);
   const [editValue, setEditValue] = useState("");
   const [renameError, setRenameError] = useState("");
@@ -102,7 +105,10 @@ export function LibraryPicker({
     }
   };
 
+  const closeMenu = () => setMenu(null);
+
   const startEdit = (kind: ItemKind, name: string) => {
+    setMenu(null);
     setEditing({ kind, name });
     setEditValue(name);
     setRenameError("");
@@ -143,6 +149,7 @@ export function LibraryPicker({
   };
 
   const startDelete = (kind: ItemKind, name: string) => {
+    setMenu(null);
     setDeleting({ kind, name });
     setDeleteError("");
   };
@@ -175,7 +182,7 @@ export function LibraryPicker({
     longPressFired.current = false;
     pressTimer.current = setTimeout(() => {
       longPressFired.current = true;
-      startEdit(kind, name);
+      setMenu({ kind, name });
     }, LONG_PRESS_MS);
   };
   const handlePressEnd = () => {
@@ -193,8 +200,31 @@ export function LibraryPicker({
   };
 
   const renderItem = (kind: ItemKind, name: string, isSelected: boolean, onSelect: () => void) => {
+    const isMenuOpen = menu?.kind === kind && menu.name === name;
     const isEditing = editing?.kind === kind && editing.name === name;
     const isDeleting = deleting?.kind === kind && deleting.name === name;
+
+    if (isMenuOpen) {
+      return (
+        <div key={`${kind}-${name}`} className="flex items-center gap-1.5 bg-slate-50 rounded-2xl p-1.5 flex-wrap">
+          <span className="text-xs font-semibold text-slate-500 px-1">{name}</span>
+          <button onClick={() => startEdit(kind, name)} className="text-xs font-bold px-2 py-1.5 rounded-xl flex items-center gap-1 min-h-[40px]" style={{ color: sectionColor, backgroundColor: `${sectionColor}1a` }}>
+            <PencilLine size={13} /> Rename
+          </button>
+          <button
+            onClick={() => { setMenu(null); onRequestMove(kind, name); }}
+            className="text-xs font-bold px-2 py-1.5 rounded-xl flex items-center gap-1 min-h-[40px]"
+            style={{ color: sectionColor, backgroundColor: `${sectionColor}1a` }}
+          >
+            <ArrowRightLeft size={13} /> Move / Copy
+          </button>
+          <button onClick={() => startDelete(kind, name)} className="text-xs font-bold text-red-500 bg-red-50 px-2 py-1.5 rounded-xl flex items-center gap-1 min-h-[40px]">
+            <Trash2 size={13} /> Delete
+          </button>
+          <button onClick={closeMenu} className="text-xs font-bold text-slate-400 px-2 min-h-[40px]">Cancel</button>
+        </div>
+      );
+    }
 
     if (isDeleting) {
       return (
@@ -229,9 +259,6 @@ export function LibraryPicker({
             {busy ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />} Save
           </Btn>
           <button onClick={cancelEdit} disabled={busy} className="text-xs font-bold text-slate-400 px-2 min-h-[40px]">Cancel</button>
-          <button onClick={() => startDelete(kind, name)} disabled={busy} className="text-red-400 px-2 min-w-[40px] min-h-[40px] flex items-center justify-center" title="Delete">
-            <Trash2 size={14} />
-          </button>
         </div>
       );
     }
@@ -317,7 +344,7 @@ export function LibraryPicker({
         </div>
       )}
 
-      <p className="text-[11px] text-slate-400">Tip: press and hold a name for a couple of seconds to rename or delete it.</p>
+      <p className="text-[11px] text-slate-400">Tip: press and hold a name for a couple of seconds for rename, move/copy, and delete options.</p>
     </div>
   );
 }

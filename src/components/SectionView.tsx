@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { WordDetailCard } from "@/components/WordDetailCard";
 import { LibraryPicker, type TreeSelection } from "@/components/LibraryPicker";
 import { AddWordsPanel } from "@/components/AddWordsPanel";
+import { MoveCopyModal } from "@/components/MoveCopyModal";
 import { Flashcards } from "@/components/Flashcards";
 import { SentenceBuilder } from "@/components/SentenceBuilder";
 import { FillBlank } from "@/components/FillBlank";
@@ -59,6 +60,7 @@ export function SectionView({
   const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
   const [bulkDeleteError, setBulkDeleteError] = useState("");
   const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<{ kind: "library" | "folder" | "list"; id: string; name: string } | null>(null);
 
   const listNode = selection.list ? tree[selection.library]?.folders[selection.folder]?.lists[selection.list] : undefined;
   const words = useMemo(() => listNode?.words ?? [], [listNode]);
@@ -210,6 +212,28 @@ export function SectionView({
     await refetch();
   };
 
+  const requestMove = (kind: "library" | "folder" | "list", name: string) => {
+    let id: string | undefined;
+    if (kind === "library") id = tree[name]?.id;
+    else if (kind === "folder") id = tree[selection.library]?.folders[name]?.id;
+    else id = tree[selection.library]?.folders[selection.folder]?.lists[name]?.id;
+    if (!id) return;
+    setMoveTarget({ kind, id, name });
+  };
+
+  const onMoveDone = async (mode: "move" | "copy") => {
+    await refetch();
+    if (mode === "move" && moveTarget) {
+      if (moveTarget.kind === "library" && selection.library === moveTarget.name) {
+        setSelection({ library: "", folder: "", list: "" });
+      } else if (moveTarget.kind === "folder" && selection.folder === moveTarget.name) {
+        setSelection({ ...selection, folder: "", list: "" });
+      } else if (moveTarget.kind === "list" && selection.list === moveTarget.name) {
+        setSelection({ ...selection, list: "" });
+      }
+    }
+  };
+
   const saveWords = async (listId: string, target: TreeSelection, words: GeneratedWord[]) => {
     await fetch("/api/words", {
       method: "POST",
@@ -302,6 +326,7 @@ export function SectionView({
           onDeleteLibrary={deleteLibrary}
           onDeleteFolder={deleteFolder}
           onDeleteList={deleteList}
+          onRequestMove={requestMove}
           onSave={saveWords}
         />
       )}
@@ -322,8 +347,24 @@ export function SectionView({
             onDeleteLibrary={deleteLibrary}
             onDeleteFolder={deleteFolder}
             onDeleteList={deleteList}
+            onRequestMove={requestMove}
           />
         </div>
+      )}
+
+      {moveTarget && (
+        <MoveCopyModal
+          kind={moveTarget.kind}
+          sourceId={moveTarget.id}
+          sourceName={moveTarget.name}
+          currentLearnerId={learnerId}
+          sectionKey={sectionKey}
+          sectionColor={meta.color}
+          suggestedLibraryName={selection.library}
+          suggestedFolderName={selection.folder}
+          onClose={() => setMoveTarget(null)}
+          onDone={onMoveDone}
+        />
       )}
 
       {tab === "browse" && isExtendedList && (

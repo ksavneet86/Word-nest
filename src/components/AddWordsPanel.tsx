@@ -21,6 +21,7 @@ export function AddWordsPanel({
   onDeleteLibrary,
   onDeleteFolder,
   onDeleteList,
+  onRequestMove,
   onSave,
 }: {
   tree: SectionTree;
@@ -36,6 +37,7 @@ export function AddWordsPanel({
   onDeleteLibrary: (name: string) => Promise<void>;
   onDeleteFolder: (name: string) => Promise<void>;
   onDeleteList: (name: string) => Promise<void>;
+  onRequestMove: (kind: "library" | "folder" | "list", name: string) => void;
   onSave: (listId: string, target: TreeSelection, words: GeneratedWord[]) => Promise<void>;
 }) {
   const [mode, setMode] = useState<"type" | "upload">("type");
@@ -180,6 +182,7 @@ export function AddWordsPanel({
           onDeleteLibrary={onDeleteLibrary}
           onDeleteFolder={onDeleteFolder}
           onDeleteList={onDeleteList}
+          onRequestMove={onRequestMove}
         />
       </div>
 
