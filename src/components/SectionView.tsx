@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
-  ArrowDownAZ, ArrowUpAZ, Brain, BookOpen, Clock, Download, Layers, Mail, MessageCircle,
+  ArrowDownAZ, ArrowUpAZ, Brain, BookOpen, CheckSquare, Clock, Download, Layers, Loader2, Mail, MessageCircle,
   PencilLine, Plus, Puzzle, Sparkles, Trash2, TrendingUp,
 } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
@@ -54,6 +54,11 @@ export function SectionView({
   const [selection, setSelection] = useState<TreeSelection>({ library: "", folder: "", list: "" });
   const [sortBy, setSortBy] = useState<"az" | "za" | "recent">("az");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState("");
+  const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
 
   const listNode = selection.list ? tree[selection.library]?.folders[selection.folder]?.lists[selection.list] : undefined;
   const words = useMemo(() => listNode?.words ?? [], [listNode]);
@@ -70,6 +75,17 @@ export function SectionView({
   const filteredWords = categoryFilter === "all" ? sortedWords : sortedWords.filter((w) => w.category === categoryFilter);
 
   const isExtendedList = sectionKey === "elevenPlus" && selection.list === "Extended List (500+ words)";
+
+  // Reset selection/select-mode whenever the active list changes (React's recommended
+  // "adjust state during render" pattern, since this isn't syncing with an external system).
+  const [selectResetKey, setSelectResetKey] = useState(selection.list);
+  if (selectResetKey !== selection.list) {
+    setSelectResetKey(selection.list);
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setConfirmingBulkDelete(false);
+    setBulkDeleteError("");
+  }
 
   const onSessionComplete = async (entry: { type: "quiz" | "blank" | "sentence"; correct: number; total: number }) => {
     await fetch("/api/sessions", {
@@ -210,6 +226,42 @@ export function SectionView({
     await refetch();
   };
 
+  const toggleWordSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const selectAllWords = () => setSelectedIds(new Set(filteredWords.map((w) => w.id)));
+  const clearSelectedWords = () => setSelectedIds(new Set());
+
+  const deleteSelectedWords = async () => {
+    if (!listNode || selectedIds.size === 0) return;
+    setBulkDeleteBusy(true);
+    setBulkDeleteError("");
+    try {
+      const res = await fetch("/api/words", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listId: listNode.id, ids: Array.from(selectedIds) }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Couldn't delete the selected words");
+      }
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      setConfirmingBulkDelete(false);
+      await refetch();
+    } catch (e) {
+      setBulkDeleteError(e instanceof Error ? e.message : "Couldn't delete the selected words");
+    } finally {
+      setBulkDeleteBusy(false);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center gap-3 mb-5">
@@ -287,6 +339,13 @@ export function SectionView({
                   <Btn variant="soft" color={meta.color} onClick={() => exportPDF(selection.list, filteredWords)}><Download size={15} /> Print / Save PDF</Btn>
                   <Btn variant="soft" color={meta.color} onClick={() => window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(selection.list)}&body=${encodeURIComponent(shareText(selection.list, filteredWords))}`, "_blank")}><Mail size={15} /> Share via Gmail</Btn>
                   <Btn variant="soft" color={meta.color} onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(shareText(selection.list, filteredWords))}`, "_blank")}><MessageCircle size={15} /> Share via WhatsApp</Btn>
+                  <Btn
+                    variant={selectMode ? "solid" : "soft"}
+                    color={meta.color}
+                    onClick={() => setSelectMode((s) => !s)}
+                  >
+                    <CheckSquare size={15} /> {selectMode ? "Cancel select" : "Select"}
+                  </Btn>
                 </div>
                 <div className="flex gap-1.5">
                   <button onClick={() => setSortBy("az")} title="A to Z" className="p-2 rounded-xl min-w-[40px] min-h-[40px]" style={sortBy === "az" ? { backgroundColor: meta.color, color: "white" } : { backgroundColor: meta.soft, color: meta.color }}><ArrowDownAZ size={15} /></button>
@@ -294,6 +353,36 @@ export function SectionView({
                   <button onClick={() => setSortBy("recent")} title="Recently added" className="p-2 rounded-xl min-w-[40px] min-h-[40px]" style={sortBy === "recent" ? { backgroundColor: meta.color, color: "white" } : { backgroundColor: meta.soft, color: meta.color }}><Clock size={15} /></button>
                 </div>
               </div>
+
+              {selectMode && (
+                <div className="flex items-center gap-2 mb-4 flex-wrap bg-slate-50 rounded-2xl p-3">
+                  <Btn variant="soft" color={meta.color} onClick={selectAllWords}>Select all ({filteredWords.length})</Btn>
+                  <Btn variant="soft" color={meta.color} onClick={clearSelectedWords}>Clear</Btn>
+                  <span className="text-sm text-slate-500">{selectedIds.size} selected</span>
+                  {!confirmingBulkDelete ? (
+                    <Btn
+                      variant="solid"
+                      color="#DC2626"
+                      onClick={() => setConfirmingBulkDelete(true)}
+                      disabled={selectedIds.size === 0}
+                      className="ml-auto"
+                    >
+                      <Trash2 size={15} /> Delete selected
+                    </Btn>
+                  ) : (
+                    <div className="flex items-center gap-2 ml-auto flex-wrap">
+                      <span className="text-sm font-semibold text-red-600">
+                        Delete {selectedIds.size} word{selectedIds.size === 1 ? "" : "s"}? This can&apos;t be undone.
+                      </span>
+                      <Btn variant="solid" color="#DC2626" onClick={deleteSelectedWords} disabled={bulkDeleteBusy}>
+                        {bulkDeleteBusy ? <Loader2 className="animate-spin" size={15} /> : <Trash2 size={15} />} Confirm
+                      </Btn>
+                      <button onClick={() => setConfirmingBulkDelete(false)} disabled={bulkDeleteBusy} className="text-xs font-bold text-slate-400 px-2 min-h-[40px]">Cancel</button>
+                    </div>
+                  )}
+                  {bulkDeleteError && <p className="text-xs text-red-500 w-full">{bulkDeleteError}</p>}
+                </div>
+              )}
 
               {categories.length > 0 && (
                 <div className="flex gap-1.5 mb-4 flex-wrap">
@@ -306,10 +395,16 @@ export function SectionView({
 
               <div className="space-y-3">
                 {filteredWords.map((w) => (
-                  <div key={w.id} className="relative group">
-                    <WordDetailCard w={w} color={meta.color} showSpellingMode={sectionKey === "spelling"} />
-                    <button onClick={() => deleteWord(w.id)} className="absolute top-4 right-16 text-slate-300 hover:text-red-400 min-w-[40px] min-h-[40px] flex items-center justify-center"><Trash2 size={16} /></button>
-                  </div>
+                  <WordDetailCard
+                    key={w.id}
+                    w={w}
+                    color={meta.color}
+                    showSpellingMode={sectionKey === "spelling"}
+                    onDelete={() => deleteWord(w.id)}
+                    selectMode={selectMode}
+                    selected={selectedIds.has(w.id)}
+                    onToggleSelect={() => toggleWordSelected(w.id)}
+                  />
                 ))}
               </div>
             </>

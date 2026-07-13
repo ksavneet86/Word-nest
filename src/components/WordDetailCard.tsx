@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Volume2, Eye, EyeOff } from "lucide-react";
+import { Volume2, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { PictoVisual } from "@/components/ui/PictoVisual";
 import { MotionClip } from "@/components/ui/MotionClip";
@@ -11,7 +11,23 @@ import { speak } from "@/lib/client-helpers";
 import { POS_COLORS } from "@/lib/constants";
 import type { WordRecord } from "@/lib/types";
 
-export function WordDetailCard({ w, color, showSpellingMode }: { w: WordRecord; color: string; showSpellingMode?: boolean }) {
+export function WordDetailCard({
+  w,
+  color,
+  showSpellingMode,
+  onDelete,
+  selectMode,
+  selected,
+  onToggleSelect,
+}: {
+  w: WordRecord;
+  color: string;
+  showSpellingMode?: boolean;
+  onDelete?: () => void;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+}) {
   const [showSyn, setShowSyn] = useState(false);
   const { speechRate } = useSettings();
   const forms = w.forms || {};
@@ -22,6 +38,16 @@ export function WordDetailCard({ w, color, showSpellingMode }: { w: WordRecord; 
     <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-4">
+          {selectMode && (
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={onToggleSelect}
+              className="w-5 h-5 rounded shrink-0"
+              style={{ accentColor: color }}
+              aria-label={`Select ${w.word}`}
+            />
+          )}
           <div className="rounded-2xl p-3" style={{ backgroundColor: `${color}15` }}>
             <PictoVisual pictogramId={w.pictogramId} emoji={w.emoji} box="w-16 h-16" emojiSize="text-4xl" />
           </div>
@@ -37,13 +63,25 @@ export function WordDetailCard({ w, color, showSpellingMode }: { w: WordRecord; 
             <p className="text-slate-600 mt-1">{w.meaning}</p>
           </div>
         </div>
-        <button
-          onClick={() => speak(w.word, speechRate)}
-          className="shrink-0 rounded-full p-2.5 min-w-[40px] min-h-[40px]"
-          style={{ backgroundColor: `${color}15`, color }}
-        >
-          <Volume2 size={18} />
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => speak(w.word, speechRate)}
+            className="rounded-full p-2.5 min-w-[40px] min-h-[40px]"
+            style={{ backgroundColor: `${color}15`, color }}
+          >
+            <Volume2 size={18} />
+          </button>
+          {!selectMode && onDelete && (
+            <button
+              onClick={onDelete}
+              className="rounded-full p-2.5 min-w-[40px] min-h-[40px] text-slate-400 hover:text-red-500"
+              style={{ backgroundColor: "#F8FAFC" }}
+              aria-label={`Delete ${w.word}`}
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
       {w.sentenceTip && (

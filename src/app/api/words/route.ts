@@ -41,3 +41,20 @@ export async function POST(request: NextRequest) {
     return handleApiError(e);
   }
 }
+
+/** Bulk-deletes words from a list — used by the "select all / delete selected" flow. */
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await requireUser();
+    const { listId, ids } = (await request.json()) as { listId: string; ids: string[] };
+    if (!listId || !Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestError("listId and a non-empty ids array are required");
+    }
+    await assertListOwnership(listId, user);
+
+    const { count } = await prisma.word.deleteMany({ where: { id: { in: ids }, wordListId: listId } });
+    return NextResponse.json({ ok: true, count });
+  } catch (e) {
+    return handleApiError(e);
+  }
+}
