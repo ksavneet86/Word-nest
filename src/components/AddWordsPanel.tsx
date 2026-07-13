@@ -35,14 +35,11 @@ export function AddWordsPanel({
   const [mode, setMode] = useState<"type" | "upload">("type");
   const [rawWords, setRawWords] = useState("");
   const [loading, setLoading] = useState(false);
-  const [generatingMore, setGeneratingMore] = useState(false);
   const [preview, setPreview] = useState<(GeneratedWord & { _key: string })[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [fileName, setFileName] = useState("");
   const [dragOver, setDragOver] = useState(false);
-
-  const CONTINUE_BATCH_SIZE = 40;
 
   const canGenerate = target.library && target.folder && target.list;
   const listId = canGenerate ? tree[target.library]?.folders[target.folder]?.lists[target.list]?.id : undefined;
@@ -95,39 +92,6 @@ export function AddWordsPanel({
     setLoading(false);
   };
 
-  const generateRemaining = async (words: string[], doneSoFar: number, total: number) => {
-    if (!words.length) {
-      setNotice("");
-      setGeneratingMore(false);
-      return;
-    }
-    setGeneratingMore(true);
-    setNotice(`Generating meanings for the rest of the list… ${doneSoFar}/${total} words done`);
-    const batch = words.slice(0, CONTINUE_BATCH_SIZE);
-    const rest = words.slice(CONTINUE_BATCH_SIZE);
-    try {
-      const res = await fetch("/api/words/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ words: batch }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        setError(data?.error || "Couldn't generate meanings for the rest of the list — the words already found are still below.");
-        setNotice("");
-        setGeneratingMore(false);
-        return;
-      }
-      const generated = ((data.words ?? []) as GeneratedWord[]).filter((g) => markIfNew(g.word));
-      setPreview((prev) => [...prev, ...generated.map((g) => ({ ...g, _key: uid() }))]);
-      await generateRemaining(rest, doneSoFar + batch.length, total);
-    } catch {
-      setError("Couldn't generate meanings for the rest of the list — the words already found are still below.");
-      setNotice("");
-      setGeneratingMore(false);
-    }
-  };
-
   const handleFile = async (file: File) => {
     setFileName(file.name);
     setLoading(true);
@@ -138,6 +102,10 @@ export function AddWordsPanel({
       const upload = await compressImageForUpload(file);
       const formData = new FormData();
       formData.append("file", upload);
+      formData.append("existingWords", JSON.stringify(Array.from(seenWordsRef.current)));
+      // The server extracts every word AND generates all their meanings in this one
+      // request (it can run for several minutes), so the whole job finishes even if
+      // this tab gets backgrounded while the network request is in flight.
       const res = await fetch("/api/words/extract", { method: "POST", body: formData });
       if (res.status === 413) {
         setError("That file is too large — try a smaller photo or a lower-resolution scan.");
@@ -151,33 +119,28 @@ export function AddWordsPanel({
         return;
       }
       const rawGenerated = (data.words ?? []) as GeneratedWord[];
-      if (!rawGenerated.length) {
-        setError("No words found in that file.");
-        setLoading(false);
-        return;
-      }
       const words = rawGenerated.filter((g) => markIfNew(g.word));
-      const skippedFirstBatch = rawGenerated.length - words.length;
       setPreview(words.map((g) => ({ ...g, _key: uid() })));
       setLoading(false);
 
-      let leftoverDeduped: string[] = [];
-      if (
-        typeof data.foundCount === "number" &&
-        typeof data.processedCount === "number" &&
-        data.foundCount > data.processedCount &&
-        Array.isArray(data.allWords)
-      ) {
-        const leftoverRaw = (data.allWords as string[]).slice(data.processedCount);
-        leftoverDeduped = leftoverRaw.filter(markIfNew);
-      }
+      const foundCount = typeof data.foundCount === "number" ? data.foundCount : rawGenerated.length;
+      const newWordsFound = typeof data.newWordsFound === "number" ? data.newWordsFound : rawGenerated.length;
+      const processedCount = typeof data.processedCount === "number" ? data.processedCount : rawGenerated.length;
+      const skippedDuplicates = foundCount - newWordsFound;
+      const skippedForCap = newWordsFound - processedCount;
 
-      if (leftoverDeduped.length) {
-        generateRemaining(leftoverDeduped, words.length, words.length + leftoverDeduped.length);
-      } else if (!words.length && skippedFirstBatch) {
+      if (!rawGenerated.length && !skippedDuplicates) {
+        setError("No words found in that file.");
+      } else if (!words.length && skippedDuplicates) {
         setError("All the words found are already in this list.");
-      } else if (skippedFirstBatch) {
-        setNotice(`Skipped ${skippedFirstBatch} word${skippedFirstBatch === 1 ? "" : "s"} already in this list.`);
+      } else if (skippedDuplicates && skippedForCap > 0) {
+        setNotice(
+          `Skipped ${skippedDuplicates} word${skippedDuplicates === 1 ? "" : "s"} already in this list. Found ${skippedForCap} more new words than could be processed at once — try a second photo for the rest.`
+        );
+      } else if (skippedDuplicates) {
+        setNotice(`Skipped ${skippedDuplicates} word${skippedDuplicates === 1 ? "" : "s"} already in this list.`);
+      } else if (skippedForCap > 0) {
+        setNotice(`Found ${skippedForCap} more new words than could be processed at once — try a second photo for the rest.`);
       }
       return;
     } catch {
@@ -275,14 +238,15 @@ export function AddWordsPanel({
               </div>
 
               {fileName && !loading && <p className="text-sm text-slate-500">Selected: {fileName}</p>}
-              {loading && <p className="text-sm flex items-center gap-2 text-slate-500"><Loader2 className="animate-spin" size={16} /> Reading file &amp; generating meanings…</p>}
+              {loading && (
+                <p className="text-sm flex items-center gap-2 text-slate-500">
+                  <Loader2 className="animate-spin" size={16} /> Reading file &amp; generating meanings — this can take a
+                  minute or two for a long list, feel free to switch apps and come back…
+                </p>
+              )}
             </div>
           )}
-          {notice && (
-            <p className="text-sm text-amber-600 mt-2 flex items-center gap-2">
-              {generatingMore && <Loader2 className="animate-spin" size={14} />} {notice}
-            </p>
-          )}
+          {notice && <p className="text-sm text-amber-600 mt-2">{notice}</p>}
           {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
         </div>
       )}
@@ -301,7 +265,6 @@ export function AddWordsPanel({
             ))}
           </div>
           <Btn color={sectionColor} onClick={save}><Check size={16} /> Save {preview.length} words to {target.list}</Btn>
-          {generatingMore && <p className="text-xs text-slate-400">More words are still being added below — you can wait for all of them or save what&apos;s here now.</p>}
         </div>
       )}
     </div>

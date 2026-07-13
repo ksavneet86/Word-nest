@@ -63,23 +63,36 @@ const GENERATE_SYSTEM =
   "common phrase that finds a well-tagged, recognizable clip on Giphy, e.g. 'shy kid' or 'running fast'. " +
   "Prefer simple everyday tags over elaborate scene descriptions, since long descriptive phrases tend to return irrelevant results.)";
 
-/** Ports generateWordBatch() from the reference artifact — batches of 3 words per Claude call. */
+/** Runs `fn` over `items` with at most `limit` calls in flight at once, preserving order. */
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/** Ports generateWordBatch() from the reference artifact — batches of 3 words per Claude call, run several batches concurrently so a whole word list can finish inside one request. */
 export async function generateWordBatch(words: string[]): Promise<GeneratedWord[]> {
-  const results: GeneratedWord[] = [];
-  for (let i = 0; i < words.length; i += 3) {
-    const chunk = words.slice(i, i + 3);
+  const chunks: string[][] = [];
+  for (let i = 0; i < words.length; i += 3) chunks.push(words.slice(i, i + 3));
+
+  const chunkResults = await mapWithConcurrency(chunks, 5, async (chunk) => {
     const parsed = await callClaudeJSON<GeneratedWord[]>(
       GENERATE_SYSTEM,
       [{ type: "text", text: `Words: ${JSON.stringify(chunk)}` }],
       4096,
       "Some of these words needed too much detail to generate at once — try uploading a smaller batch."
     );
-    const withPics = await Promise.all(
-      parsed.map(async (w) => ({ ...w, pictogramId: await fetchPictogramId(w.word) }))
-    );
-    results.push(...withPics);
-  }
-  return results;
+    return Promise.all(parsed.map(async (w) => ({ ...w, pictogramId: await fetchPictogramId(w.word) })));
+  });
+
+  return chunkResults.flat();
 }
 
 const EXTRACT_SYSTEM =
