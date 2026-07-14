@@ -12,10 +12,10 @@ import { LibraryPicker, type TreeSelection } from "@/components/LibraryPicker";
 import { AddWordsPanel } from "@/components/AddWordsPanel";
 import { MoveCopyModal } from "@/components/MoveCopyModal";
 import { Flashcards } from "@/components/Flashcards";
-import { SentenceBuilder } from "@/components/SentenceBuilder";
-import { FillBlank } from "@/components/FillBlank";
+import { SentenceFlow } from "@/components/SentenceFlow";
+import { FillBlankFlow } from "@/components/FillBlankFlow";
 import { QuizFlow } from "@/components/QuizFlow";
-import { SpellingGameSetup } from "@/components/SpellingGameSetup";
+import { SpellFlow } from "@/components/SpellFlow";
 import { ProgressView } from "@/components/ProgressView";
 import { FirstThenGate } from "@/components/FirstThenGate";
 import { ExtendedGenerator } from "@/components/ExtendedGenerator";
@@ -516,34 +516,21 @@ export function SectionView({
           <EmptyState text="Pick a list above first." />
         ))}
 
-      {tab === "spell" &&
-        (selection.list ? (
-          <SpellingGameSetup words={sortedWords} color={meta.color} onAnswer={onAnswer} onSessionComplete={onSessionComplete} />
-        ) : (
-          <EmptyState text="Pick a list above first." />
-        ))}
+      {tab === "spell" && (
+        <SpellFlow tree={tree} selection={selection} color={meta.color} onAnswer={onAnswer} onSessionComplete={onSessionComplete} />
+      )}
 
-      {tab === "sentence" &&
-        (selection.list ? (
-          <FirstThenGate firstLabel="Build sentences from word tiles" thenLabel="Check each one when you're ready" color={meta.color}>
-            <SentenceBuilder words={sortedWords} color={meta.color} onSessionComplete={onSessionComplete} />
-          </FirstThenGate>
-        ) : (
-          <EmptyState text="Pick a list above first." />
-        ))}
+      {tab === "sentence" && (
+        <SentenceFlow tree={tree} selection={selection} color={meta.color} onSessionComplete={onSessionComplete} />
+      )}
 
       {tab === "quiz" && (
         <QuizFlow tree={tree} selection={selection} color={meta.color} onAnswer={onAnswer} onSessionComplete={onSessionComplete} />
       )}
 
-      {tab === "blank" &&
-        (selection.list ? (
-          <FirstThenGate firstLabel="Fill in the missing word" thenLabel="See how many you get right" color={meta.color}>
-            <FillBlank words={words} color={meta.color} onSessionComplete={onSessionComplete} />
-          </FirstThenGate>
-        ) : (
-          <EmptyState text="Pick a list above first." />
-        ))}
+      {tab === "blank" && (
+        <FillBlankFlow tree={tree} selection={selection} color={meta.color} onSessionComplete={onSessionComplete} />
+      )}
 
       {tab === "progress" && (
         <ProgressView

@@ -18,11 +18,13 @@ export function SpellingGameSetup({
   color,
   onAnswer,
   onSessionComplete,
+  onBack,
 }: {
   words: WordRecord[];
   color: string;
   onAnswer: (word: WordRecord, correct: boolean, points: number) => void;
   onSessionComplete: (entry: { type: "quiz"; correct: number; total: number }) => void;
+  onBack?: () => void;
 }) {
   const [tier, setTier] = useState<SpellingTier | null>(null);
 
@@ -39,6 +41,11 @@ export function SpellingGameSetup({
 
   return (
     <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm max-w-md mx-auto space-y-3">
+      {onBack && (
+        <button onClick={onBack} className="text-xs font-bold flex items-center gap-1 min-h-[40px]" style={{ color }}>
+          ← Change word settings
+        </button>
+      )}
       <h3 className="font-extrabold text-slate-700 flex items-center gap-2"><Sparkles size={18} style={{ color }} /> Spell it! — choose a difficulty</h3>
       {TIERS.map((t) => (
         <button

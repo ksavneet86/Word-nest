@@ -1,22 +1,35 @@
 "use client";
 
-import { useState } from "react";
-import { Brain, Settings2, TriangleAlert } from "lucide-react";
+import { useState, type ComponentType } from "react";
+import { Settings2, TriangleAlert, type LucideProps } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
 import { collectWords } from "@/lib/collect-words";
 import { shuffle } from "@/lib/client-helpers";
 import type { SectionTree, WordRecord } from "@/lib/types";
 import type { TreeSelection } from "@/components/LibraryPicker";
 
-export function QuizSetup({
+/**
+ * Shared "which words should this activity use" chooser — scope (list/folder/library),
+ * difficulty, count, and the only-wrong / only-due filters. Ported from the quiz setup so
+ * every practice activity (quiz, spell, sentences, fill-blanks) offers the same criteria.
+ */
+export function ActivitySetup({
   tree,
   selection,
   color,
+  title,
+  actionLabel,
+  actionIcon: ActionIcon,
+  minWords = 3,
   onStart,
 }: {
   tree: SectionTree;
   selection: TreeSelection;
   color: string;
+  title: string;
+  actionLabel: string;
+  actionIcon: ComponentType<LucideProps>;
+  minWords?: number;
   onStart: (words: WordRecord[]) => void;
 }) {
   const [level, setLevel] = useState<"list" | "folder" | "library">("list");
@@ -37,14 +50,14 @@ export function QuizSetup({
       )
     : [];
 
-  const startQuiz = () => {
+  const start = () => {
     const n = count === "all" ? pool.length : Math.min(parseInt(count, 10), pool.length);
     onStart(shuffle(pool).slice(0, n));
   };
 
   return (
     <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm max-w-md mx-auto space-y-4">
-      <h3 className="font-extrabold text-slate-700 flex items-center gap-2"><Settings2 size={18} style={{ color }} /> Quiz setup</h3>
+      <h3 className="font-extrabold text-slate-700 flex items-center gap-2"><Settings2 size={18} style={{ color }} /> {title}</h3>
 
       <div>
         <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Scope</label>
@@ -80,7 +93,7 @@ export function QuizSetup({
       </div>
 
       <div>
-        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Number of questions</label>
+        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Number of words</label>
         <div className="flex gap-2 mt-1 flex-wrap">
           {([["10", "10"], ["15", "15"], ["20", "20"], ["30", "30"], ["all", "All"]] as const).map(([v, l]) => (
             <button
@@ -104,8 +117,9 @@ export function QuizSetup({
         Only words due for review (spaced repetition)
       </label>
 
-      <p className="text-sm text-slate-500">{pool.length} word{pool.length === 1 ? "" : "s"} match — quiz will use {count === "all" ? pool.length : Math.min(parseInt(count, 10), pool.length)} of them.</p>
-      <Btn color={color} disabled={pool.length < 3} onClick={startQuiz}><Brain size={16} /> Start quiz</Btn>
+      <p className="text-sm text-slate-500">{pool.length} word{pool.length === 1 ? "" : "s"} match — this will use {count === "all" ? pool.length : Math.min(parseInt(count, 10), pool.length)} of them.</p>
+      {pool.length > 0 && pool.length < minWords && <p className="text-xs text-amber-600">Need at least {minWords} words to start — widen the scope or add more words.</p>}
+      <Btn color={color} disabled={pool.length < minWords} onClick={start}><ActionIcon size={16} /> {actionLabel}</Btn>
     </div>
   );
 }
