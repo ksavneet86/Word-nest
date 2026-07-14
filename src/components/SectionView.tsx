@@ -11,13 +11,12 @@ import { WordDetailCard } from "@/components/WordDetailCard";
 import { LibraryPicker, type TreeSelection } from "@/components/LibraryPicker";
 import { AddWordsPanel } from "@/components/AddWordsPanel";
 import { MoveCopyModal } from "@/components/MoveCopyModal";
-import { Flashcards } from "@/components/Flashcards";
+import { FlashcardsFlow } from "@/components/FlashcardsFlow";
 import { SentenceFlow } from "@/components/SentenceFlow";
 import { FillBlankFlow } from "@/components/FillBlankFlow";
 import { QuizFlow } from "@/components/QuizFlow";
 import { SpellFlow } from "@/components/SpellFlow";
 import { ProgressView } from "@/components/ProgressView";
-import { FirstThenGate } from "@/components/FirstThenGate";
 import { ExtendedGenerator } from "@/components/ExtendedGenerator";
 import { useSectionTree } from "@/lib/hooks/useSectionTree";
 import { useSessionLog } from "@/lib/hooks/useSessionLog";
@@ -507,14 +506,9 @@ export function SectionView({
           <EmptyState text="Pick or create a library / folder / list above to see words." />
         ))}
 
-      {tab === "flash" &&
-        (selection.list ? (
-          <FirstThenGate firstLabel={`Look through ${sortedWords.length} picture cards`} thenLabel="Tap each card to check the meaning" color={meta.color}>
-            <Flashcards words={sortedWords} color={meta.color} section={sectionKey} />
-          </FirstThenGate>
-        ) : (
-          <EmptyState text="Pick a list above first." />
-        ))}
+      {tab === "flash" && (
+        <FlashcardsFlow tree={tree} selection={selection} color={meta.color} section={sectionKey} />
+      )}
 
       {tab === "spell" && (
         <SpellFlow tree={tree} selection={selection} color={meta.color} onAnswer={onAnswer} onSessionComplete={onSessionComplete} />
