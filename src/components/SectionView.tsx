@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownAZ, ArrowUpAZ, Brain, BookOpen, CheckSquare, Clock, Download, Layers, Loader2, Mail, MessageCircle,
   PencilLine, Plus, Puzzle, Sparkles, Trash2, TrendingUp,
@@ -8,6 +8,7 @@ import {
 import { Btn } from "@/components/ui/Btn";
 import { EmptyState } from "@/components/EmptyState";
 import { WordDetailCard } from "@/components/WordDetailCard";
+import { WordSearch } from "@/components/WordSearch";
 import { LibraryPicker, type TreeSelection } from "@/components/LibraryPicker";
 import { AddWordsPanel } from "@/components/AddWordsPanel";
 import { MoveCopyModal } from "@/components/MoveCopyModal";
@@ -60,6 +61,21 @@ export function SectionView({
   const [bulkDeleteError, setBulkDeleteError] = useState("");
   const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
   const [moveTarget, setMoveTarget] = useState<{ kind: "library" | "folder" | "list"; id: string; name: string } | null>(null);
+  const [highlightWordId, setHighlightWordId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!highlightWordId) return;
+    document.getElementById(`word-${highlightWordId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const t = setTimeout(() => setHighlightWordId(null), 2500);
+    return () => clearTimeout(t);
+  }, [highlightWordId]);
+
+  const jumpToWord = (target: TreeSelection, wordId: string) => {
+    setSelection(target);
+    setTab("browse");
+    setCategoryFilter("all");
+    setHighlightWordId(wordId);
+  };
 
   const listNode = selection.list ? tree[selection.library]?.folders[selection.folder]?.lists[selection.list] : undefined;
   const words = useMemo(() => listNode?.words ?? [], [listNode]);
@@ -358,6 +374,8 @@ export function SectionView({
         ))}
       </div>
 
+      <WordSearch tree={tree} color={meta.color} onJumpTo={jumpToWord} />
+
       {tab === "add" && (
         <AddWordsPanel
           tree={tree}
@@ -495,6 +513,7 @@ export function SectionView({
                     selectMode={selectMode}
                     selected={selectedIds.has(w.id)}
                     onToggleSelect={() => toggleWordSelected(w.id)}
+                    highlighted={w.id === highlightWordId}
                   />
                 ))}
               </div>

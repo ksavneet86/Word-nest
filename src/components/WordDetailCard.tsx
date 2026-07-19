@@ -20,6 +20,7 @@ export function WordDetailCard({
   selected,
   onToggleSelect,
   number,
+  highlighted,
 }: {
   w: WordRecord;
   color: string;
@@ -29,6 +30,7 @@ export function WordDetailCard({
   selected?: boolean;
   onToggleSelect?: () => void;
   number?: number;
+  highlighted?: boolean;
 }) {
   const [showSyn, setShowSyn] = useState(false);
   const { speechRate } = useSettings();
@@ -37,7 +39,11 @@ export function WordDetailCard({
   const hasVerbForms = forms.present || forms.past || forms.pastParticiple;
 
   return (
-    <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+    <div
+      id={`word-${w.id}`}
+      className="bg-white rounded-3xl p-5 shadow-sm border transition-shadow"
+      style={highlighted ? { borderColor: color, boxShadow: `0 0 0 4px ${color}33` } : { borderColor: "#F1F5F9" }}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-4">
           {typeof number === "number" && (
