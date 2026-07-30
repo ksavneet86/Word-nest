@@ -43,6 +43,7 @@ export interface LearnerSettings {
   firstThenEnabled: boolean;
   errorlessMode: boolean;
   remindersEnabled: boolean;
+  showImages: boolean;
 }
 
 export const SETTINGS_DEFAULTS: LearnerSettings = {
@@ -54,6 +55,7 @@ export const SETTINGS_DEFAULTS: LearnerSettings = {
   firstThenEnabled: false,
   errorlessMode: false,
   remindersEnabled: false,
+  showImages: true,
 };
 
 export const ZOOM_LEVELS: Record<LearnerSettings["textSize"], number> = {

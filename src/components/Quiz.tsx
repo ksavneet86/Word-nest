@@ -25,7 +25,7 @@ export function Quiz({
   onAnswer?: (word: WordRecord, correct: boolean, points?: number) => void;
   onSessionComplete?: (entry: { type: "quiz"; correct: number; total: number }) => void;
 }) {
-  const { errorlessMode, soundEnabled } = useSettings();
+  const { errorlessMode, soundEnabled, showImages } = useSettings();
   const [order] = useState(() => shuffle(words));
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
@@ -85,7 +85,7 @@ export function Quiz({
       <p className="text-sm font-bold text-slate-400 mb-2">Question {idx + 1} / {order.length}</p>
       <div className="rounded-3xl p-6 shadow-sm border" style={{ backgroundColor: `${color}0d`, borderColor: `${color}33` }}>
         <div className="flex items-center gap-3">
-          <PictoVisual pictogramId={w.pictogramId} emoji={w.emoji} box="w-16 h-16" emojiSize="text-4xl" />
+          {showImages && <PictoVisual pictogramId={w.pictogramId} emoji={w.emoji} box="w-16 h-16" emojiSize="text-4xl" />}
           <h2 className="text-2xl font-extrabold text-slate-800">What does &quot;{w.word}&quot; mean?</h2>
         </div>
         <div className="mt-5 space-y-2.5">

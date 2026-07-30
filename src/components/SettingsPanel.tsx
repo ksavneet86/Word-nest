@@ -89,6 +89,7 @@ export function SettingsPanel({
           </div>
         </div>
 
+        <ToggleRow label="Show pictures" desc="Shows the picture/emoji for each word in Quiz and Flashcards. Turn off for a text-only view." checked={settings.showImages} onChange={(v) => onUpdate({ showImages: v })} />
         <ToggleRow label="Reduce motion" desc="Turns off the bouncing animation on pictures." checked={settings.reduceMotion} onChange={(v) => onUpdate({ reduceMotion: v })} />
         <ToggleRow label="Dyslexia-friendly font" desc="Switches to a rounder, easier-to-read typeface." checked={settings.dyslexiaFont} onChange={(v) => onUpdate({ dyslexiaFont: v })} />
         <ToggleRow label="Sound effects" desc="Gentle chime on quiz answers." checked={settings.soundEnabled} onChange={(v) => onUpdate({ soundEnabled: v })} />

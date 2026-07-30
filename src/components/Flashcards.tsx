@@ -13,7 +13,7 @@ import type { WordRecord } from "@/lib/types";
 export function Flashcards({ words, color, section }: { words: WordRecord[]; color: string; section: string }) {
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const { speechRate } = useSettings();
+  const { speechRate, showImages } = useSettings();
   if (!words.length) return <EmptyState text="Add some words to this list to start flashcards." />;
   const w = words[idx];
   const isSpelling = section === "spelling";
@@ -31,7 +31,7 @@ export function Flashcards({ words, color, section }: { words: WordRecord[]; col
       >
         {!flipped ? (
           <>
-            <PictoVisual pictogramId={w.pictogramId} emoji={w.emoji} box="w-28 h-28" emojiSize="text-6xl" />
+            {showImages && <PictoVisual pictogramId={w.pictogramId} emoji={w.emoji} box="w-28 h-28" emojiSize="text-6xl" />}
             <h2 className="text-3xl font-extrabold text-slate-800">{isSpelling ? "🔊 Listen & spell" : w.word}</h2>
             {isSpelling && (
               <Btn color={color} onClick={(e) => { e.stopPropagation(); speak(w.word, speechRate); }}>
