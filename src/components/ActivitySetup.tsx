@@ -37,18 +37,26 @@ export function ActivitySetup({
   const [onlyWrong, setOnlyWrong] = useState(false);
   const [onlyDue, setOnlyDue] = useState(false);
   const [count, setCount] = useState("15");
+  const [useCustomRange, setUseCustomRange] = useState(false);
+  const [rangeFrom, setRangeFrom] = useState("1");
+  const [rangeTo, setRangeTo] = useState("");
   const [now] = useState(() => Date.now());
 
   const scopeReady =
     level === "list" ? !!selection.list : level === "folder" ? !!(selection.library && selection.folder) : !!selection.library;
-  const pool = scopeReady
-    ? collectWords(tree, selection, level).filter(
-        (w) =>
-          (difficulty === "any" || w.difficulty === difficulty) &&
-          (!onlyWrong || (w.timesWrong || 0) > 0) &&
-          (!onlyDue || (w.srsDue || 0) <= now)
-      )
-    : [];
+  const scopedWords = scopeReady ? collectWords(tree, selection, level) : [];
+
+  const rangeFromNum = Math.max(1, parseInt(rangeFrom, 10) || 1);
+  const rangeToNum = Math.min(scopedWords.length, parseInt(rangeTo, 10) || scopedWords.length);
+  const rangedWords =
+    useCustomRange && scopedWords.length ? scopedWords.slice(rangeFromNum - 1, Math.max(rangeFromNum, rangeToNum)) : scopedWords;
+
+  const pool = rangedWords.filter(
+    (w) =>
+      (difficulty === "any" || w.difficulty === difficulty) &&
+      (!onlyWrong || (w.timesWrong || 0) > 0) &&
+      (!onlyDue || (w.srsDue || 0) <= now)
+  );
 
   const start = () => {
     const n = count === "all" ? pool.length : Math.min(parseInt(count, 10), pool.length);
@@ -106,6 +114,40 @@ export function ActivitySetup({
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+          <input type="checkbox" checked={useCustomRange} onChange={(e) => setUseCustomRange(e.target.checked)} />
+          Use a custom word range (e.g. words 1–100)
+        </label>
+        {useCustomRange && (
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">From</span>
+            <input
+              type="number"
+              min={1}
+              max={scopedWords.length || 1}
+              value={rangeFrom}
+              onChange={(e) => setRangeFrom(e.target.value)}
+              className="w-16 px-2 py-1.5 rounded-xl text-sm border-2 border-slate-200"
+            />
+            <span className="text-xs font-bold uppercase tracking-wide text-slate-500">To</span>
+            <input
+              type="number"
+              min={1}
+              max={scopedWords.length || 1}
+              placeholder={String(scopedWords.length || 1)}
+              value={rangeTo}
+              onChange={(e) => setRangeTo(e.target.value)}
+              className="w-16 px-2 py-1.5 rounded-xl text-sm border-2 border-slate-200"
+            />
+            <span className="text-xs text-slate-400">of {scopedWords.length} in scope</span>
+          </div>
+        )}
+        {useCustomRange && (
+          <p className="text-xs text-slate-400 mt-1">Range is by the order words were added to the list (matches &quot;Recently added&quot; sort in Browse).</p>
+        )}
       </div>
 
       <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
