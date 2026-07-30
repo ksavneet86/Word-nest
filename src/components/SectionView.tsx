@@ -509,6 +509,7 @@ export function SectionView({
                     number={i + 1}
                     color={meta.color}
                     showSpellingMode={sectionKey === "spelling"}
+                    section={sectionKey}
                     onDelete={() => deleteWord(w.id)}
                     selectMode={selectMode}
                     selected={selectedIds.has(w.id)}
@@ -538,7 +539,7 @@ export function SectionView({
       )}
 
       {tab === "quiz" && (
-        <QuizFlow tree={tree} selection={selection} color={meta.color} onAnswer={onAnswer} onSessionComplete={onSessionComplete} />
+        <QuizFlow tree={tree} selection={selection} color={meta.color} section={sectionKey} onAnswer={onAnswer} onSessionComplete={onSessionComplete} />
       )}
 
       {tab === "blank" && (

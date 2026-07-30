@@ -17,16 +17,26 @@ const CELEBRATE_THRESHOLD = 0.7;
 export function Quiz({
   words,
   color,
+  section,
   onAnswer,
   onSessionComplete,
 }: {
   words: WordRecord[];
   color: string;
+  section?: string;
   onAnswer?: (word: WordRecord, correct: boolean, points?: number) => void;
   onSessionComplete?: (entry: { type: "quiz"; correct: number; total: number }) => void;
 }) {
   const { errorlessMode, soundEnabled, showImages } = useSettings();
-  const [order] = useState(() => shuffle(words));
+  const isSynAnt = section === "synAnt";
+
+  // In Synonyms & Antonyms, only words that actually have a synonym or antonym saved can be tested.
+  const pool = useMemo(
+    () => (isSynAnt ? words.filter((w) => (w.synonyms?.length || 0) > 0 || (w.antonyms?.length || 0) > 0) : words),
+    [words, isSynAnt]
+  );
+
+  const [order] = useState(() => shuffle(pool));
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [score, setScore] = useState(0);
@@ -34,14 +44,46 @@ export function Quiz({
   const [celebrateKey, setCelebrateKey] = useState(0);
 
   const w = order[idx];
-  const options = useMemo(() => {
-    if (!w) return [];
-    const others = shuffle(words.filter((x) => x.id !== w.id)).slice(0, 2).map((x) => x.meaning);
-    return shuffle([w.meaning, ...others]);
+
+  const question = useMemo(() => {
+    if (!w) return null;
+    if (!isSynAnt) {
+      const others = shuffle(words.filter((x) => x.id !== w.id)).slice(0, 2).map((x) => x.meaning);
+      return {
+        prompt: `What does "${w.word}" mean?`,
+        correctAnswer: w.meaning,
+        correctLabel: "Correct meaning",
+        options: shuffle([w.meaning, ...others]),
+      };
+    }
+    const hasSyn = (w.synonyms?.length || 0) > 0;
+    const hasAnt = (w.antonyms?.length || 0) > 0;
+    const useSynonym = hasSyn && (!hasAnt || shuffle([true, false])[0]);
+    const correctList = useSynonym ? w.synonyms : w.antonyms;
+    const correctAnswer = shuffle(correctList)[0];
+    const decoys = shuffle(words.filter((x) => x.id !== w.id && x.word.toLowerCase() !== correctAnswer.toLowerCase()))
+      .slice(0, 2)
+      .map((x) => x.word);
+    return {
+      prompt: useSynonym ? `Which word means the same as "${w.word}"?` : `Which word means the opposite of "${w.word}"?`,
+      correctAnswer,
+      correctLabel: useSynonym ? "Correct synonym" : "Correct antonym",
+      options: shuffle([correctAnswer, ...decoys]),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx]);
 
-  if (words.length < 3) return <EmptyState text="Need at least 3 words in this selection to unlock the quiz." />;
+  if (pool.length < 3) {
+    return (
+      <EmptyState
+        text={
+          isSynAnt
+            ? "Need at least 3 words with synonyms or antonyms saved to unlock this quiz."
+            : "Need at least 3 words in this selection to unlock the quiz."
+        }
+      />
+    );
+  }
   if (done) {
     return (
       <div className="text-center max-w-sm mx-auto">
@@ -54,11 +96,12 @@ export function Quiz({
       </div>
     );
   }
+  if (!question) return null;
 
   const pick = (opt: string) => {
     if (selected) return;
     setSelected(opt);
-    const correct = opt === w.meaning;
+    const correct = opt === question.correctAnswer;
     if (correct) setScore((s) => s + 1);
     playBeep(correct ? "correct" : "wrong", soundEnabled);
     const effectiveCorrect = errorlessMode ? true : correct;
@@ -86,11 +129,11 @@ export function Quiz({
       <div className="rounded-3xl p-6 shadow-sm border" style={{ backgroundColor: `${color}0d`, borderColor: `${color}33` }}>
         <div className="flex items-center gap-3">
           {showImages && <PictoVisual pictogramId={w.pictogramId} emoji={w.emoji} box="w-16 h-16" emojiSize="text-4xl" />}
-          <h2 className="text-2xl font-extrabold text-slate-800">What does &quot;{w.word}&quot; mean?</h2>
+          <h2 className="text-2xl font-extrabold text-slate-800">{question.prompt}</h2>
         </div>
         <div className="mt-5 space-y-2.5">
-          {options.map((opt) => {
-            const isCorrect = opt === w.meaning;
+          {question.options.map((opt) => {
+            const isCorrect = opt === question.correctAnswer;
             const isPicked = opt === selected;
             let style = "border-2 border-slate-200 bg-white";
             if (selected) {
@@ -108,7 +151,7 @@ export function Quiz({
         </div>
         {selected && (
           <div className="mt-4 flex items-center justify-between">
-            <p className="text-sm text-slate-500">Correct meaning: <span className="font-bold text-slate-700">{w.meaning}</span></p>
+            <p className="text-sm text-slate-500">{question.correctLabel}: <span className="font-bold text-slate-700">{question.correctAnswer}</span></p>
             <Btn color={color} onClick={finishIfDone}>{idx + 1 >= order.length ? "Finish" : "Next"} <ChevronRight size={16} /></Btn>
           </div>
         )}

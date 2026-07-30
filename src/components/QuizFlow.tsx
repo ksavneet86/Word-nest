@@ -12,12 +12,14 @@ export function QuizFlow({
   tree,
   selection,
   color,
+  section,
   onAnswer,
   onSessionComplete,
 }: {
   tree: SectionTree;
   selection: TreeSelection;
   color: string;
+  section?: string;
   onAnswer: (word: WordRecord, correct: boolean, points?: number) => void;
   onSessionComplete: (entry: { type: "quiz"; correct: number; total: number }) => void;
 }) {
@@ -41,7 +43,7 @@ export function QuizFlow({
       <button onClick={() => setPool(null)} className="text-xs font-bold flex items-center gap-1 mb-3 mx-auto min-h-[40px]" style={{ color }}>
         <ArrowLeft size={13} /> Change quiz settings
       </button>
-      <Quiz words={pool} color={color} onAnswer={onAnswer} onSessionComplete={onSessionComplete} />
+      <Quiz words={pool} color={color} section={section} onAnswer={onAnswer} onSessionComplete={onSessionComplete} />
     </FirstThenGate>
   );
 }
