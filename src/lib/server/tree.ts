@@ -3,6 +3,7 @@ import { prisma } from "./db";
 import { NotFoundError } from "./api-utils";
 import { ForbiddenError } from "./auth";
 import { hasLearnerAccess } from "./learners";
+import { SHARED_SECTION_GROUP } from "@/lib/constants";
 import type { SectionTree, WordForms } from "@/lib/types";
 import type { Role, Section } from "@prisma/client";
 
@@ -59,8 +60,9 @@ export async function assertWordOwnership(wordId: string, user: CurrentUser) {
 }
 
 export async function getSectionTree(learnerProfileId: string, section: Section): Promise<SectionTree> {
+  const sectionFilter = SHARED_SECTION_GROUP.includes(section) ? { in: SHARED_SECTION_GROUP as Section[] } : section;
   const libraries = await prisma.library.findMany({
-    where: { learnerProfileId, section },
+    where: { learnerProfileId, section: sectionFilter },
     orderBy: [{ order: "asc" }, { createdAt: "asc" }],
     include: {
       folders: {

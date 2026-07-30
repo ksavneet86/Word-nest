@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/server/auth";
 import { handleApiError, BadRequestError } from "@/lib/server/api-utils";
 import { getLearnerOrThrow } from "@/lib/server/learners";
 import { prisma } from "@/lib/server/db";
-import { SECTIONS } from "@/lib/constants";
+import { SECTIONS, canonicalSection, type SectionKey } from "@/lib/constants";
 import type { Section } from "@prisma/client";
 
 export async function POST(request: NextRequest) {
@@ -16,15 +16,21 @@ export async function POST(request: NextRequest) {
     }
     await getLearnerOrThrow(learnerId, user);
 
+    // Vocabulary/Spellings/Synonyms & Antonyms share one pool of libraries per learner, so
+    // anything created from any of the three is stored under the same canonical section —
+    // otherwise the same name created from two different tabs would create two rows that
+    // then collide once merged in the UI.
+    const storedSection = canonicalSection(section as SectionKey) as Section;
+
     const { _max } = await prisma.library.aggregate({
-      where: { learnerProfileId: learnerId, section: section as Section },
+      where: { learnerProfileId: learnerId, section: storedSection },
       _max: { order: true },
     });
 
     const library = await prisma.library.upsert({
-      where: { learnerProfileId_section_name: { learnerProfileId: learnerId, section: section as Section, name: trimmed } },
+      where: { learnerProfileId_section_name: { learnerProfileId: learnerId, section: storedSection, name: trimmed } },
       update: {},
-      create: { learnerProfileId: learnerId, section: section as Section, name: trimmed, order: (_max.order ?? -1) + 1 },
+      create: { learnerProfileId: learnerId, section: storedSection, name: trimmed, order: (_max.order ?? -1) + 1 },
     });
     return NextResponse.json({ library: { id: library.id, name: library.name } });
   } catch (e) {

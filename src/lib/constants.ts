@@ -32,6 +32,19 @@ export const AVATAR_SHOP: AvatarShopItem[] = [
 
 export type SectionKey = keyof typeof SECTIONS;
 
+/**
+ * Vocabulary, Spellings, and Synonyms & Antonyms share one pool of libraries/folders/lists
+ * per learner — content uploaded under any one of these three shows up in all three, live
+ * (not a copy). 11+ Vocabulary stays separate. `canonicalSection()` normalizes storage so a
+ * library created from any of the three lands under the same section value, avoiding
+ * duplicate same-named libraries that would otherwise collide once merged in the UI.
+ */
+export const SHARED_SECTION_GROUP: SectionKey[] = ["vocab", "spelling", "synAnt"];
+
+export function canonicalSection(section: SectionKey): SectionKey {
+  return SHARED_SECTION_GROUP.includes(section) ? "vocab" : section;
+}
+
 export const EMOJI_FALLBACK = "📘";
 
 export interface LearnerSettings {
