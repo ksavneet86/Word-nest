@@ -8,6 +8,7 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { SectionView } from "@/components/SectionView";
 import { AvatarShop } from "@/components/AvatarShop";
 import { BadgesModal } from "@/components/BadgesModal";
+import { ScrollToTopButton } from "@/components/ScrollToTopButton";
 import { SettingsContext } from "@/lib/settings-context";
 import { SECTIONS, SETTINGS_DEFAULTS, ZOOM_LEVELS, type SectionKey, type LearnerSettings } from "@/lib/constants";
 import type { LearnerSummary } from "@/lib/types";
@@ -214,6 +215,8 @@ export function AppShell() {
         )}
 
         {showBadges && <BadgesModal learnerId={activeId} onClose={() => setShowBadges(false)} />}
+
+        <ScrollToTopButton />
       </div>
     </SettingsContext.Provider>
   );

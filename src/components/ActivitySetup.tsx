@@ -33,7 +33,7 @@ export function ActivitySetup({
   onStart: (words: WordRecord[]) => void;
 }) {
   const [level, setLevel] = useState<"list" | "folder" | "library">("list");
-  const [difficulty, setDifficulty] = useState("any");
+  const [difficulties, setDifficulties] = useState<string[]>(["low", "moderate", "high"]);
   const [onlyWrong, setOnlyWrong] = useState(false);
   const [onlyDue, setOnlyDue] = useState(false);
   const [count, setCount] = useState("15");
@@ -51,9 +51,13 @@ export function ActivitySetup({
   const rangedWords =
     useCustomRange && scopedWords.length ? scopedWords.slice(rangeFromNum - 1, Math.max(rangeFromNum, rangeToNum)) : scopedWords;
 
+  const toggleDifficulty = (d: string) => {
+    setDifficulties((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+  };
+
   const pool = rangedWords.filter(
     (w) =>
-      (difficulty === "any" || w.difficulty === difficulty) &&
+      difficulties.includes(w.difficulty) &&
       (!onlyWrong || (w.timesWrong || 0) > 0) &&
       (!onlyDue || (w.srsDue || 0) <= now)
   );
@@ -85,19 +89,23 @@ export function ActivitySetup({
       </div>
 
       <div>
-        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Difficulty</label>
+        <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Difficulty (pick any combination)</label>
         <div className="flex gap-2 mt-1 flex-wrap">
-          {([["any", "Any"], ["low", "Low"], ["moderate", "Moderate"], ["high", "High"]] as const).map(([v, l]) => (
-            <button
-              key={v}
-              onClick={() => setDifficulty(v)}
-              className="px-3 py-1.5 rounded-xl text-sm font-semibold border-2 min-h-[40px]"
-              style={{ borderColor: difficulty === v ? color : "#E5E7EB", color: difficulty === v ? color : "#475569" }}
-            >
-              {l}
-            </button>
-          ))}
+          {([["low", "Low"], ["moderate", "Moderate"], ["high", "High"]] as const).map(([v, l]) => {
+            const isOn = difficulties.includes(v);
+            return (
+              <button
+                key={v}
+                onClick={() => toggleDifficulty(v)}
+                className="px-3 py-1.5 rounded-xl text-sm font-semibold border-2 min-h-[40px]"
+                style={isOn ? { borderColor: color, backgroundColor: `${color}1a`, color } : { borderColor: "#E5E7EB", color: "#475569" }}
+              >
+                {l}
+              </button>
+            );
+          })}
         </div>
+        {difficulties.length === 0 && <p className="text-xs text-amber-600 mt-1">Pick at least one difficulty.</p>}
       </div>
 
       <div>
