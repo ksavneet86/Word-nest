@@ -84,6 +84,23 @@ export async function compressImageForUpload(file: File, maxDimension = 1600, qu
   return new File([blob], file.name.replace(/\.\w+$/, ext), { type });
 }
 
+/**
+ * Drives a calm, escalating status line during a long AI request (word extraction /
+ * meaning generation). The server paces itself under Gemini's rate limit and silently
+ * retries brief 429s, so a slow run is normal — the wording never implies failure.
+ * Returns a stop function; call it (e.g. in a `finally`) when the work settles.
+ */
+export function startWorkingMessages(set: (msg: string) => void): () => void {
+  const steps: [number, string][] = [
+    [8000, "Still working — long lists take a moment…"],
+    [22000, "Still working, almost there…"],
+    [45000, "Almost done — thanks for your patience…"],
+    [90000, "Still going — a big list can take a couple of minutes…"],
+  ];
+  const timers = steps.map(([ms, msg]) => setTimeout(() => set(msg), ms));
+  return () => timers.forEach(clearTimeout);
+}
+
 export function shuffle<T>(arr: T[]): T[] {
   return [...arr].sort(() => Math.random() - 0.5);
 }

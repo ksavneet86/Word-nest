@@ -3,6 +3,10 @@ import { requireUser } from "@/lib/server/auth";
 import { handleApiError, BadRequestError } from "@/lib/server/api-utils";
 import { generateWordBatch } from "@/lib/ai/gemini";
 
+// Meaning generation is paced to stay under Gemini's 15 req/min free-tier cap, so a
+// large typed batch (up to 60 words) can take a while — give it room to finish.
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   try {
     await requireUser();

@@ -5,7 +5,7 @@ import { Check, FolderPlus, Loader2, PencilLine, Upload, Wand2 } from "lucide-re
 import { Btn } from "@/components/ui/Btn";
 import { LibraryPicker, type TreeSelection } from "@/components/LibraryPicker";
 import type { GeneratedWord, SectionTree } from "@/lib/types";
-import { uid, compressImageForUpload } from "@/lib/client-helpers";
+import { uid, compressImageForUpload, startWorkingMessages } from "@/lib/client-helpers";
 
 export function AddWordsPanel({
   tree,
@@ -45,6 +45,7 @@ export function AddWordsPanel({
   const [mode, setMode] = useState<"type" | "upload">("type");
   const [rawWords, setRawWords] = useState("");
   const [loading, setLoading] = useState(false);
+  const [working, setWorking] = useState("");
   const [preview, setPreview] = useState<(GeneratedWord & { _key: string })[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -86,20 +87,25 @@ export function AddWordsPanel({
     }
     setLoading(true);
     setError("");
+    setWorking("");
     setNotice(skipped ? `Skipped ${skipped} word${skipped === 1 ? "" : "s"} already in this list.` : "");
+    const stopWorking = startWorkingMessages(setWorking);
     try {
       const res = await fetch("/api/words/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ words }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Couldn't generate meanings. Try again.");
       setPreview((data.words as GeneratedWord[]).map((g) => ({ ...g, _key: uid() })));
-    } catch {
-      setError("Couldn't generate meanings. Try again.");
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : "Couldn't generate meanings. Try again.");
+    } finally {
+      stopWorking();
+      setWorking("");
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleFile = async (file: File) => {
@@ -107,7 +113,9 @@ export function AddWordsPanel({
     setLoading(true);
     setError("");
     setNotice("");
+    setWorking("");
     seenWordsRef.current = existingWordSet();
+    const stopWorking = startWorkingMessages(setWorking);
     try {
       const upload = await compressImageForUpload(file);
       const formData = new FormData();
@@ -119,19 +127,16 @@ export function AddWordsPanel({
       const res = await fetch("/api/words/extract", { method: "POST", body: formData });
       if (res.status === 413) {
         setError("That file is too large — try a smaller photo or a lower-resolution scan.");
-        setLoading(false);
         return;
       }
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         setError(data?.error || "Couldn't read that file. Try a clearer image or PDF.");
-        setLoading(false);
         return;
       }
       const rawGenerated = (data.words ?? []) as GeneratedWord[];
       const words = rawGenerated.filter((g) => markIfNew(g.word));
       setPreview(words.map((g) => ({ ...g, _key: uid() })));
-      setLoading(false);
 
       const foundCount = typeof data.foundCount === "number" ? data.foundCount : rawGenerated.length;
       const newWordsFound = typeof data.newWordsFound === "number" ? data.newWordsFound : rawGenerated.length;
@@ -152,11 +157,13 @@ export function AddWordsPanel({
       } else if (skippedForCap > 0) {
         setNotice(`Found ${skippedForCap} more new words than could be processed at once — try a second photo for the rest.`);
       }
-      return;
     } catch {
       setError("Couldn't read that file. Try a clearer image or PDF.");
+    } finally {
+      stopWorking();
+      setWorking("");
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const save = async () => {
@@ -207,6 +214,11 @@ export function AddWordsPanel({
               <Btn color={sectionColor} onClick={generateFromTyped} disabled={loading}>
                 {loading ? <Loader2 className="animate-spin" size={16} /> : <Wand2 size={16} />} Generate meanings
               </Btn>
+              {loading && working && (
+                <p className="text-sm flex items-center gap-2 text-slate-500">
+                  <Loader2 className="animate-spin" size={16} /> {working}
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -255,8 +267,9 @@ export function AddWordsPanel({
               {fileName && !loading && <p className="text-sm text-slate-500">Selected: {fileName}</p>}
               {loading && (
                 <p className="text-sm flex items-center gap-2 text-slate-500">
-                  <Loader2 className="animate-spin" size={16} /> Reading file &amp; generating meanings — this can take a
-                  minute or two for a long list, feel free to switch apps and come back…
+                  <Loader2 className="animate-spin" size={16} />
+                  {working ||
+                    "Reading file & generating meanings — this can take a minute or two for a long list, feel free to switch apps and come back…"}
                 </p>
               )}
             </div>

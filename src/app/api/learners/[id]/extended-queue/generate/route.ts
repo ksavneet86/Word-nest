@@ -9,6 +9,9 @@ import type { Prisma } from "@prisma/client";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+// One chunk is a single paced Gemini call, but a 429 backoff can add ~45s — leave headroom.
+export const maxDuration = 120;
+
 const LIBRARY_NAME = "11+ Vocabulary (by Claude)";
 const FOLDER_NAME = "General";
 const LIST_NAME = "Extended List (500+ words)";

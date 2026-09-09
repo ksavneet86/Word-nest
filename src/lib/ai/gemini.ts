@@ -7,6 +7,41 @@ import { BadRequestError } from "@/lib/server/api-utils";
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
+// --- Rate limiting ----------------------------------------------------------
+// Gemini's free tier allows 15 requests/minute. A photo of a long word list can
+// fan out into dozens of calls, so we (a) space out call *starts* to ~14/min and
+// (b) transparently retry on 429s. Both keep a big job under the cap instead of
+// surfacing an error. The spacing gate is per server instance; concurrent HTTP
+// requests each throttle independently, and the retry loop covers any overlap.
+const MIN_CALL_SPACING_MS = Number(process.env.GEMINI_MIN_CALL_SPACING_MS) || 4300;
+const MAX_RATE_LIMIT_RETRIES = 4;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+let nextCallSlot = 0;
+/** Blocks until this caller's turn, reserving the slot so concurrent callers stack up rather than collide. */
+async function waitForCallSlot(): Promise<void> {
+  const now = Date.now();
+  const slot = Math.max(now, nextCallSlot);
+  nextCallSlot = slot + MIN_CALL_SPACING_MS;
+  if (slot > now) await sleep(slot - now);
+}
+
+/** How long Gemini asks us to wait after a 429 — from the Retry-After header or error.details[].retryDelay ("38s"). */
+function retryAfterMs(headers: Headers, body: unknown): number | null {
+  const header = headers.get("retry-after");
+  if (header) {
+    const secs = Number(header);
+    if (Number.isFinite(secs)) return secs * 1000;
+    const when = Date.parse(header);
+    if (Number.isFinite(when)) return Math.max(0, when - Date.now());
+  }
+  const details = (body as { error?: { details?: { retryDelay?: string }[] } })?.error?.details;
+  const raw = details?.find((d) => typeof d?.retryDelay === "string")?.retryDelay;
+  const match = raw ? /^([\d.]+)s$/.exec(raw.trim()) : null;
+  return match ? Math.round(parseFloat(match[1]) * 1000) : null;
+}
+
 type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
 
 /** Minimal shape of a Gemini generateContent response we rely on. */
@@ -52,59 +87,85 @@ async function generateContent(opts: {
     },
   };
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}/models/${MODEL}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify(requestBody),
-    });
-  } catch (e) {
-    console.error("[gemini] request could not be sent", e);
-    throw new BadRequestError(
-      "The AI service had trouble with that request — please try again in a moment."
-    );
-  }
+  for (let attempt = 0; ; attempt++) {
+    await waitForCallSlot();
 
-  const rawBody = await res.text();
-  let parsedBody: unknown = null;
-  try {
-    parsedBody = rawBody ? JSON.parse(rawBody) : null;
-  } catch {
-    /* leave parsedBody null; rawBody is used as the detail fallback */
-  }
-
-  if (!res.ok) {
-    console.error("[gemini] request failed", res.status, rawBody);
-    const detail = geminiErrorDetail(parsedBody) ?? (rawBody.trim() || null);
-    if (res.status === 400) {
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/models/${MODEL}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify(requestBody),
+      });
+    } catch (e) {
+      if (attempt < 2) {
+        console.warn(`[gemini] network error, retrying (attempt ${attempt + 1})`, e);
+        await sleep(2000 * (attempt + 1));
+        continue;
+      }
+      console.error("[gemini] request could not be sent", e);
       throw new BadRequestError(
-        detail
-          ? `Gemini rejected that request: ${detail}`
-          : "Couldn't read that file — try a different photo (JPEG, PNG, GIF, WEBP) or a PDF instead."
+        "The AI service had trouble with that request — please try again in a moment."
       );
     }
-    throw new BadRequestError(
-      detail
-        ? `The AI service had trouble with that request: ${detail}`
-        : "The AI service had trouble with that request — please try again in a moment."
-    );
-  }
 
-  const data = parsedBody as GeminiResponse;
-  const candidate = data?.candidates?.[0];
-  if (!candidate) {
-    const blocked = data?.promptFeedback?.blockReasonMessage || data?.promptFeedback?.blockReason;
-    console.error("[gemini] response had no candidates", rawBody);
-    throw new BadRequestError(
-      blocked
-        ? `Gemini blocked that request: ${blocked}`
-        : "The AI service returned nothing — please try again in a moment."
-    );
-  }
+    const rawBody = await res.text();
+    let parsedBody: unknown = null;
+    try {
+      parsedBody = rawBody ? JSON.parse(rawBody) : null;
+    } catch {
+      /* leave parsedBody null; rawBody is used as the detail fallback */
+    }
 
-  const text = (candidate.content?.parts ?? []).map((p) => p.text ?? "").join("");
-  return { text, finishReason: candidate.finishReason ?? null };
+    // Rate limited (429) or transient overload (503) — back off and retry silently.
+    if ((res.status === 429 || res.status === 503) && attempt < MAX_RATE_LIMIT_RETRIES) {
+      const waitMs = retryAfterMs(res.headers, parsedBody) ?? Math.min(4000 * 2 ** attempt, 45000);
+      console.warn(
+        `[gemini] ${res.status}; backing off ${waitMs}ms (attempt ${attempt + 1}/${MAX_RATE_LIMIT_RETRIES})`
+      );
+      // Push the shared slot out too, so other in-flight calls also slow down.
+      nextCallSlot = Math.max(nextCallSlot, Date.now() + waitMs);
+      await sleep(waitMs);
+      continue;
+    }
+
+    if (!res.ok) {
+      console.error("[gemini] request failed", res.status, rawBody);
+      const detail = geminiErrorDetail(parsedBody) ?? (rawBody.trim() || null);
+      if (res.status === 429 || res.status === 503) {
+        throw new BadRequestError(
+          "The AI service is very busy right now — please wait a minute and try again."
+        );
+      }
+      if (res.status === 400) {
+        throw new BadRequestError(
+          detail
+            ? `Gemini rejected that request: ${detail}`
+            : "Couldn't read that file — try a different photo (JPEG, PNG, GIF, WEBP) or a PDF instead."
+        );
+      }
+      throw new BadRequestError(
+        detail
+          ? `The AI service had trouble with that request: ${detail}`
+          : "The AI service had trouble with that request — please try again in a moment."
+      );
+    }
+
+    const data = parsedBody as GeminiResponse;
+    const candidate = data?.candidates?.[0];
+    if (!candidate) {
+      const blocked = data?.promptFeedback?.blockReasonMessage || data?.promptFeedback?.blockReason;
+      console.error("[gemini] response had no candidates", rawBody);
+      throw new BadRequestError(
+        blocked
+          ? `Gemini blocked that request: ${blocked}`
+          : "The AI service returned nothing — please try again in a moment."
+      );
+    }
+
+    const text = (candidate.content?.parts ?? []).map((p) => p.text ?? "").join("");
+    return { text, finishReason: candidate.finishReason ?? null };
+  }
 }
 
 /**
@@ -222,17 +283,21 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   return results;
 }
 
-/** Batches of 3 words per Gemini call, run several batches concurrently so a whole word list can finish inside one request. */
+// Words per Gemini call. Bigger batches mean fewer calls against the 15/min cap;
+// 10 rich word objects sit comfortably inside an 8192-token JSON response.
+const WORDS_PER_CALL = 10;
+
+/** Generates full word data in batches of WORDS_PER_CALL, a few batches at a time (the rate limiter in generateContent paces the actual calls). */
 export async function generateWordBatch(words: string[]): Promise<GeneratedWord[]> {
   const chunks: string[][] = [];
-  for (let i = 0; i < words.length; i += 3) chunks.push(words.slice(i, i + 3));
+  for (let i = 0; i < words.length; i += WORDS_PER_CALL) chunks.push(words.slice(i, i + WORDS_PER_CALL));
 
-  const chunkResults = await mapWithConcurrency(chunks, 5, async (chunk) => {
+  const chunkResults = await mapWithConcurrency(chunks, 3, async (chunk) => {
     const parsed = await callGeminiJSON<GeneratedWord[]>(
       GENERATE_SYSTEM,
       [{ text: `Words: ${JSON.stringify(chunk)}` }],
       WORD_BATCH_SCHEMA,
-      4096,
+      8192,
       "Some of these words needed too much detail to generate at once — try uploading a smaller batch."
     );
     return Promise.all(parsed.map(async (w) => ({ ...w, pictogramId: await fetchPictogramId(w.word) })));
