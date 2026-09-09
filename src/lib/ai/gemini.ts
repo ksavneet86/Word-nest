@@ -168,27 +168,27 @@ async function generateContent(opts: {
   }
 }
 
+/** Thrown when Gemini hit its output-token limit mid-JSON, so the caller can split the batch and retry. */
+class TruncatedResponseError extends Error {}
+
 /**
  * Calls Gemini in native JSON mode (responseMimeType + responseSchema) and parses the result.
  * Far more reliable than instructing "return only JSON" in the prompt text.
+ * Throws TruncatedResponseError when the response was cut off at the token limit.
  */
 async function callGeminiJSON<T>(
   system: string,
   parts: GeminiPart[],
   responseSchema: Record<string, unknown>,
-  maxOutputTokens: number,
-  truncatedMessage: string
+  maxOutputTokens: number
 ): Promise<T> {
   const { text, finishReason } = await generateContent({ system, parts, maxOutputTokens, responseSchema });
   const cleaned = text.replace(/```json|```/g, "").trim();
   try {
     return JSON.parse(cleaned) as T;
   } catch {
-    throw new BadRequestError(
-      finishReason === "MAX_TOKENS"
-        ? truncatedMessage
-        : "Couldn't understand the AI's response — try again."
-    );
+    if (finishReason === "MAX_TOKENS") throw new TruncatedResponseError("Gemini response was truncated");
+    throw new BadRequestError("Couldn't understand the AI's response — try again.");
   }
 }
 
@@ -283,27 +283,43 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   return results;
 }
 
-// Words per Gemini call. Bigger batches mean fewer calls against the 15/min cap;
-// 10 rich word objects sit comfortably inside an 8192-token JSON response.
-const WORDS_PER_CALL = 10;
+// Words per Gemini call. Kept small so a rich JSON response for the group fits well
+// inside the 8192-token budget; if a group still overflows, generateForGroup splits
+// it and retries. The rate limiter in generateContent paces the resulting calls.
+const WORDS_PER_CALL = 5;
 
-/** Generates full word data in batches of WORDS_PER_CALL, a few batches at a time (the rate limiter in generateContent paces the actual calls). */
-export async function generateWordBatch(words: string[]): Promise<GeneratedWord[]> {
-  const chunks: string[][] = [];
-  for (let i = 0; i < words.length; i += WORDS_PER_CALL) chunks.push(words.slice(i, i + WORDS_PER_CALL));
-
-  const chunkResults = await mapWithConcurrency(chunks, 3, async (chunk) => {
+/** Generates full word data for one small group; on a truncated response, splits the group in half and retries so a big page still completes. */
+async function generateForGroup(words: string[]): Promise<GeneratedWord[]> {
+  try {
     const parsed = await callGeminiJSON<GeneratedWord[]>(
       GENERATE_SYSTEM,
-      [{ text: `Words: ${JSON.stringify(chunk)}` }],
+      [{ text: `Words: ${JSON.stringify(words)}` }],
       WORD_BATCH_SCHEMA,
-      8192,
-      "Some of these words needed too much detail to generate at once — try uploading a smaller batch."
+      8192
     );
     return Promise.all(parsed.map(async (w) => ({ ...w, pictogramId: await fetchPictogramId(w.word) })));
-  });
+  } catch (e) {
+    if (!(e instanceof TruncatedResponseError)) throw e;
+    if (words.length <= 1) {
+      throw new BadRequestError(
+        `"${words[0]}" needed too much detail to generate — try again, or remove it from the list.`
+      );
+    }
+    const mid = Math.ceil(words.length / 2);
+    const first = await generateForGroup(words.slice(0, mid));
+    const second = await generateForGroup(words.slice(mid));
+    return [...first, ...second];
+  }
+}
 
-  return chunkResults.flat();
+/** Generates full word data in groups of WORDS_PER_CALL, a few groups at a time (the rate limiter in generateContent paces the actual calls). */
+export async function generateWordBatch(words: string[]): Promise<GeneratedWord[]> {
+  const groups: string[][] = [];
+  for (let i = 0; i < words.length; i += WORDS_PER_CALL) groups.push(words.slice(i, i + WORDS_PER_CALL));
+
+  const groupResults = await mapWithConcurrency(groups, 3, (group) => generateForGroup(group));
+
+  return groupResults.flat();
 }
 
 const EXTRACT_SYSTEM =
