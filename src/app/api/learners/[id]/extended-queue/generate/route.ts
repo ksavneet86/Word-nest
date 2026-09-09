@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/server/auth";
 import { handleApiError, NotFoundError } from "@/lib/server/api-utils";
 import { getLearnerOrThrow } from "@/lib/server/learners";
-import { generateWordBatch } from "@/lib/ai/anthropic";
+import { generateWordBatch } from "@/lib/ai/gemini";
 import { prisma } from "@/lib/server/db";
 import { difficultyForWord } from "@/lib/constants";
 import type { Prisma } from "@prisma/client";

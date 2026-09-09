@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/server/auth";
 import { handleApiError, BadRequestError } from "@/lib/server/api-utils";
-import { generateWordBatch } from "@/lib/ai/anthropic";
+import { generateWordBatch } from "@/lib/ai/gemini";
 
 export async function POST(request: NextRequest) {
   try {

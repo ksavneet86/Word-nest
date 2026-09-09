@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/server/auth";
 import { handleApiError, BadRequestError } from "@/lib/server/api-utils";
-import { extractWordsFromFile, generateWordBatch } from "@/lib/ai/anthropic";
+import { extractWordsFromFile, generateWordBatch } from "@/lib/ai/gemini";
 
 // Extraction + meaning-generation for a whole word list now happens in this one request
 // (instead of the client orchestrating several follow-up calls), so the work finishes on
@@ -15,8 +15,8 @@ type SupportedMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp
 /**
  * Detects the file type from its leading bytes rather than trusting the browser-supplied
  * `file.type`. The same plain JPEG can arrive as "image/jpeg", "image/jpg", "image/pjpeg"
- * or "" depending on the client's OS/MIME registry, and Claude's API only accepts the four
- * canonical image media types — so forwarding `file.type` verbatim made valid JPEGs fail.
+ * or "" depending on the client's OS/MIME registry, and the AI provider only accepts a few
+ * canonical media types — so forwarding `file.type` verbatim made valid JPEGs fail.
  * Returns null when the bytes aren't a format we support.
  */
 function detectMediaType(buffer: Buffer): SupportedMediaType | null {
