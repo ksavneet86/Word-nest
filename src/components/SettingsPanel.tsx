@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Loader2, Mail, Settings2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Check, Loader2, Lock, Mail, Settings2, X } from "lucide-react";
 import { ToggleRow } from "@/components/ToggleRow";
 import { ShareModal } from "@/components/ShareModal";
 import { Btn } from "@/components/ui/Btn";
@@ -31,6 +31,50 @@ export function SettingsPanel({
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
   const [showShare, setShowShare] = useState(false);
+
+  // Account-level "Parent PIN" that gates word deletion (one PIN across all this guardian's learners).
+  const [parentPinSet, setParentPinSet] = useState<boolean | null>(null);
+  const [ppCurrent, setPpCurrent] = useState("");
+  const [ppNew, setPpNew] = useState("");
+  const [ppConfirm, setPpConfirm] = useState("");
+  const [ppEditing, setPpEditing] = useState(false);
+  const [ppError, setPpError] = useState("");
+  const [ppSaved, setPpSaved] = useState(false);
+  const [ppBusy, setPpBusy] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/account/pin")
+      .then((r) => r.json())
+      .then((d) => setParentPinSet(!!d?.hasPin))
+      .catch(() => setParentPinSet(false));
+  }, []);
+
+  const ppDigits = (v: string) => v.replace(/\D/g, "").slice(0, 4);
+
+  const saveParentPin = async () => {
+    if (!/^\d{4}$/.test(ppNew)) { setPpError("PIN must be exactly 4 digits."); return; }
+    if (ppNew !== ppConfirm) { setPpError("The two PINs don't match."); return; }
+    if (parentPinSet && ppCurrent.length !== 4) { setPpError("Enter your current PIN."); return; }
+    setPpBusy(true);
+    setPpError("");
+    setPpSaved(false);
+    try {
+      const res = await fetch("/api/account/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parentPinSet ? { pin: ppNew, currentPin: ppCurrent } : { pin: ppNew }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Couldn't save the PIN.");
+      setParentPinSet(true);
+      setPpEditing(false);
+      setPpSaved(true);
+      setPpCurrent(""); setPpNew(""); setPpConfirm("");
+    } catch (e) {
+      setPpError(e instanceof Error ? e.message : "Couldn't save the PIN.");
+    } finally {
+      setPpBusy(false);
+    }
+  };
   const [nameInput, setNameInput] = useState(learnerName);
   const [nameError, setNameError] = useState("");
   const [nameBusy, setNameBusy] = useState(false);
@@ -140,6 +184,78 @@ export function SettingsPanel({
             <button onClick={savePin} className="text-sm font-bold text-slate-600 px-3 py-2 min-h-[40px]">Save PIN</button>
           </div>
           {pinError && <p className="text-xs text-red-500 mt-1">{pinError}</p>}
+        </div>
+
+        <div className="border-t border-slate-100 pt-4">
+          <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+            <Lock size={14} /> Parent PIN
+            {parentPinSet && <span className="text-xs font-normal text-slate-400">(set)</span>}
+          </label>
+          <p className="text-xs text-slate-400 mb-2">
+            A 4-digit PIN that must be entered before a word can be deleted, so children using the app can&apos;t
+            remove words. One PIN covers every learner on your account. For your security it&apos;s never shown again
+            once saved{parentPinSet ? " — enter your current PIN to change it." : "."}
+          </p>
+
+          {parentPinSet === null ? (
+            <p className="text-xs text-slate-400 flex items-center gap-2"><Loader2 className="animate-spin" size={12} /> Loading…</p>
+          ) : parentPinSet && !ppEditing ? (
+            <button
+              onClick={() => { setPpEditing(true); setPpSaved(false); setPpError(""); }}
+              className="text-sm font-bold text-slate-600 px-3 py-2 min-h-[40px] rounded-xl bg-slate-100"
+            >
+              Change PIN
+            </button>
+          ) : (
+            <div className="space-y-2">
+              {parentPinSet && (
+                <input
+                  value={ppCurrent}
+                  onChange={(e) => { setPpCurrent(ppDigits(e.target.value)); setPpError(""); }}
+                  placeholder="Current PIN"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  aria-label="Current Parent PIN"
+                  className="px-3 py-2 rounded-xl text-sm border-2 border-slate-200 w-full"
+                />
+              )}
+              <div className="flex gap-2">
+                <input
+                  value={ppNew}
+                  onChange={(e) => { setPpNew(ppDigits(e.target.value)); setPpError(""); }}
+                  placeholder={parentPinSet ? "New PIN" : "1234"}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  aria-label="New Parent PIN"
+                  className="px-3 py-2 rounded-xl text-sm border-2 border-slate-200 w-28"
+                />
+                <input
+                  value={ppConfirm}
+                  onChange={(e) => { setPpConfirm(ppDigits(e.target.value)); setPpError(""); }}
+                  placeholder="Confirm"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  aria-label="Confirm new Parent PIN"
+                  className="px-3 py-2 rounded-xl text-sm border-2 border-slate-200 w-28"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Btn onClick={saveParentPin} disabled={ppBusy} className="px-4 py-2 text-sm">
+                  {ppBusy ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />} Save PIN
+                </Btn>
+                {parentPinSet && (
+                  <button
+                    onClick={() => { setPpEditing(false); setPpError(""); setPpCurrent(""); setPpNew(""); setPpConfirm(""); }}
+                    className="text-xs font-bold text-slate-400 px-2 min-h-[40px]"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {ppError && <p className="text-xs text-red-500 mt-1">{ppError}</p>}
+          {ppSaved && <p className="text-xs text-green-600 mt-1">Parent PIN saved.</p>}
         </div>
 
         {isOwner && (

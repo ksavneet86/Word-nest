@@ -5,7 +5,6 @@ import { Volume2, Eye, EyeOff, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { PictoVisual } from "@/components/ui/PictoVisual";
 import { MotionClip } from "@/components/ui/MotionClip";
-import { RecordPlayback } from "@/components/ui/RecordPlayback";
 import { useSettings } from "@/lib/settings-context";
 import { speak } from "@/lib/client-helpers";
 import { POS_COLORS } from "@/lib/constants";
@@ -126,7 +125,6 @@ export function WordDetailCard({
           )}
 
           <MotionClip word={w} color={color} />
-          <RecordPlayback word={w} />
 
           <button onClick={() => setShowSyn((s) => !s)} className="mt-3 text-xs font-bold flex items-center gap-1 min-h-[40px]" style={{ color }}>
             {showSyn ? <EyeOff size={14} /> : <Eye size={14} />} {showSyn ? "Hide" : "Show"}{" "}synonyms &amp; antonyms
