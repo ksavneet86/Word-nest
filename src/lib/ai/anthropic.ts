@@ -107,15 +107,21 @@ export async function generateWordBatch(words: string[]): Promise<GeneratedWord[
 const EXTRACT_SYSTEM =
   "Extract every distinct English vocabulary word visible in this file. Return ONLY a JSON array of lowercase strings, no prose, no duplicates, no markdown fences. Ignore numbers and punctuation.";
 
+type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
 /** Ports extractWordsFromFile() from the reference artifact. */
-export async function extractWordsFromFile(base64: string, mediaType: string, isPdf: boolean): Promise<string[]> {
+export async function extractWordsFromFile(
+  base64: string,
+  mediaType: ImageMediaType | "application/pdf",
+  isPdf: boolean
+): Promise<string[]> {
   const content: Anthropic.Messages.MessageParam["content"] = isPdf
     ? [
         { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
         { type: "text", text: "Extract the words." },
       ]
     : [
-        { type: "image", source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: base64 } },
+        { type: "image", source: { type: "base64", media_type: mediaType as ImageMediaType, data: base64 } },
         { type: "text", text: "Extract the words." },
       ];
 

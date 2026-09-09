@@ -77,7 +77,11 @@ export async function compressImageForUpload(file: File, maxDimension = 1600, qu
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
   if (!blob || blob.size >= file.size) return file;
 
-  return new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" });
+  // toBlob may fall back to PNG if the browser can't encode JPEG — label the File with the
+  // type it actually produced so it isn't sent as a mislabelled "image/jpeg".
+  const type = blob.type || "image/jpeg";
+  const ext = type === "image/png" ? ".png" : ".jpg";
+  return new File([blob], file.name.replace(/\.\w+$/, ext), { type });
 }
 
 export function shuffle<T>(arr: T[]): T[] {
