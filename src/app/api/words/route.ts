@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/server/auth";
 import { handleApiError, BadRequestError } from "@/lib/server/api-utils";
 import { assertListOwnership } from "@/lib/server/tree";
-import { assertParentPin } from "@/lib/server/parent-pin";
 import { prisma } from "@/lib/server/db";
 import { difficultyForWord } from "@/lib/constants";
 import type { GeneratedWord } from "@/lib/types";
@@ -43,15 +42,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** Bulk-deletes words from a list — used by the "select all / delete selected" flow. Parent-PIN gated. */
+/** Bulk-deletes words from a list — used by the "select all / delete selected" flow. */
 export async function DELETE(request: NextRequest) {
   try {
     const user = await requireUser();
-    const { listId, ids, pin } = (await request.json()) as { listId: string; ids: string[]; pin?: string };
+    const { listId, ids } = (await request.json()) as { listId: string; ids: string[] };
     if (!listId || !Array.isArray(ids) || ids.length === 0) {
       throw new BadRequestError("listId and a non-empty ids array are required");
     }
-    await assertParentPin(user.id, pin);
     await assertListOwnership(listId, user);
 
     const { count } = await prisma.word.deleteMany({ where: { id: { in: ids }, wordListId: listId } });

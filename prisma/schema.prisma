@@ -38,7 +38,6 @@ model User {
   id        String   @id // Clerk user id
   email     String   @unique
   role      Role     @default(guardian)
-  pinHash   String? // bcrypt hash of the account's 4-digit "Parent PIN" that gates word deletion
   createdAt DateTime @default(now())
 
   learnerProfiles LearnerProfile[]

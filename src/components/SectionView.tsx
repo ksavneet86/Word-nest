@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowDownAZ, ArrowUpAZ, Brain, BookOpen, CheckSquare, Clock, Download, Layers, Mail, MessageCircle,
+  ArrowDownAZ, ArrowUpAZ, Brain, BookOpen, CheckSquare, Clock, Download, Layers, Loader2, Mail, MessageCircle,
   PencilLine, Plus, Puzzle, Sparkles, Trash2, TrendingUp,
 } from "lucide-react";
 import { Btn } from "@/components/ui/Btn";
@@ -12,7 +12,6 @@ import { WordSearch } from "@/components/WordSearch";
 import { LibraryPicker, type TreeSelection } from "@/components/LibraryPicker";
 import { AddWordsPanel } from "@/components/AddWordsPanel";
 import { MoveCopyModal } from "@/components/MoveCopyModal";
-import { ParentPinModal } from "@/components/ParentPinModal";
 import { FlashcardsFlow } from "@/components/FlashcardsFlow";
 import { SentenceFlow } from "@/components/SentenceFlow";
 import { FillBlankFlow } from "@/components/FillBlankFlow";
@@ -58,10 +57,9 @@ export function SectionView({
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  // A pending word deletion waiting for the guardian to clear the Parent PIN modal.
-  const [pendingDelete, setPendingDelete] = useState<
-    { kind: "one"; ids: string[]; label: string } | { kind: "bulk"; ids: string[]; label: string } | null
-  >(null);
+  const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState("");
+  const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
   const [moveTarget, setMoveTarget] = useState<{ kind: "library" | "folder" | "list"; id: string; name: string } | null>(null);
   const [highlightWordId, setHighlightWordId] = useState<string | null>(null);
 
@@ -102,7 +100,8 @@ export function SectionView({
     setSelectResetKey(selection.list);
     setSelectMode(false);
     setSelectedIds(new Set());
-    setPendingDelete(null);
+    setConfirmingBulkDelete(false);
+    setBulkDeleteError("");
   }
 
   const onSessionComplete = async (entry: { type: "quiz" | "blank" | "sentence"; correct: number; total: number }) => {
@@ -309,32 +308,6 @@ export function SectionView({
     setTab("browse");
   };
 
-  // Runs once the Parent PIN modal has a verified PIN. Deletes via the pin-gated endpoints;
-  // throws with the server's message so the modal can show "wrong PIN" and stay open.
-  const runPendingDelete = async (pin: string) => {
-    if (!pendingDelete) return;
-    if (pendingDelete.kind === "one") {
-      const res = await fetch(`/api/words/${pendingDelete.ids[0]}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Couldn't delete this word");
-    } else {
-      if (!listNode) return;
-      const res = await fetch("/api/words", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listId: listNode.id, ids: pendingDelete.ids, pin }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Couldn't delete the selected words");
-      setSelectedIds(new Set());
-      setSelectMode(false);
-    }
-    setPendingDelete(null);
-    await refetch();
-  };
-
   const toggleWordSelected = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -346,13 +319,29 @@ export function SectionView({
   const selectAllWords = () => setSelectedIds(new Set(filteredWords.map((w) => w.id)));
   const clearSelectedWords = () => setSelectedIds(new Set());
 
-  const askDeleteSelected = () => {
-    if (selectedIds.size === 0) return;
-    setPendingDelete({
-      kind: "bulk",
-      ids: Array.from(selectedIds),
-      label: `${selectedIds.size} word${selectedIds.size === 1 ? "" : "s"}`,
-    });
+  const deleteSelectedWords = async () => {
+    if (!listNode || selectedIds.size === 0) return;
+    setBulkDeleteBusy(true);
+    setBulkDeleteError("");
+    try {
+      const res = await fetch("/api/words", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listId: listNode.id, ids: Array.from(selectedIds) }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Couldn't delete the selected words");
+      }
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      setConfirmingBulkDelete(false);
+      await refetch();
+    } catch (e) {
+      setBulkDeleteError(e instanceof Error ? e.message : "Couldn't delete the selected words");
+    } finally {
+      setBulkDeleteBusy(false);
+    }
   };
 
   return (
@@ -440,14 +429,6 @@ export function SectionView({
         />
       )}
 
-      {pendingDelete && (
-        <ParentPinModal
-          action={`delete ${pendingDelete.label}`}
-          onClose={() => setPendingDelete(null)}
-          onConfirm={runPendingDelete}
-        />
-      )}
-
       {tab === "browse" && isExtendedList && (
         <ExtendedGenerator learnerId={learnerId} generatedCount={words.length} color={meta.color} onGenerated={refetch} />
       )}
@@ -481,16 +462,28 @@ export function SectionView({
                   <Btn variant="soft" color={meta.color} onClick={selectAllWords}>Select all ({filteredWords.length})</Btn>
                   <Btn variant="soft" color={meta.color} onClick={clearSelectedWords}>Clear</Btn>
                   <span className="text-sm text-slate-500">{selectedIds.size} selected</span>
-                  <Btn
-                    variant="solid"
-                    color="#DC2626"
-                    onClick={askDeleteSelected}
-                    disabled={selectedIds.size === 0}
-                    className="ml-auto"
-                  >
-                    <Trash2 size={15} /> Delete selected
-                  </Btn>
-                  <span className="text-xs text-slate-400 w-full">Deleting needs the Parent PIN.</span>
+                  {!confirmingBulkDelete ? (
+                    <Btn
+                      variant="solid"
+                      color="#DC2626"
+                      onClick={() => setConfirmingBulkDelete(true)}
+                      disabled={selectedIds.size === 0}
+                      className="ml-auto"
+                    >
+                      <Trash2 size={15} /> Delete selected
+                    </Btn>
+                  ) : (
+                    <div className="flex items-center gap-2 ml-auto flex-wrap">
+                      <span className="text-sm font-semibold text-red-600">
+                        Delete {selectedIds.size} word{selectedIds.size === 1 ? "" : "s"}? This can&apos;t be undone.
+                      </span>
+                      <Btn variant="solid" color="#DC2626" onClick={deleteSelectedWords} disabled={bulkDeleteBusy}>
+                        {bulkDeleteBusy ? <Loader2 className="animate-spin" size={15} /> : <Trash2 size={15} />} Confirm
+                      </Btn>
+                      <button onClick={() => setConfirmingBulkDelete(false)} disabled={bulkDeleteBusy} className="text-xs font-bold text-slate-400 px-2 min-h-[40px]">Cancel</button>
+                    </div>
+                  )}
+                  {bulkDeleteError && <p className="text-xs text-red-500 w-full">{bulkDeleteError}</p>}
                 </div>
               )}
 
@@ -512,7 +505,6 @@ export function SectionView({
                     color={meta.color}
                     showSpellingMode={sectionKey === "spelling"}
                     section={sectionKey}
-                    onDelete={() => setPendingDelete({ kind: "one", ids: [w.id], label: `"${w.word}"` })}
                     selectMode={selectMode}
                     selected={selectedIds.has(w.id)}
                     onToggleSelect={() => toggleWordSelected(w.id)}

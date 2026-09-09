@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Volume2, Eye, EyeOff, Trash2 } from "lucide-react";
+import { Volume2, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { PictoVisual } from "@/components/ui/PictoVisual";
 import { MotionClip } from "@/components/ui/MotionClip";
@@ -15,7 +15,6 @@ export function WordDetailCard({
   color,
   showSpellingMode,
   section,
-  onDelete,
   selectMode,
   selected,
   onToggleSelect,
@@ -26,7 +25,6 @@ export function WordDetailCard({
   color: string;
   showSpellingMode?: boolean;
   section?: string;
-  onDelete?: () => void;
   selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
@@ -86,16 +84,6 @@ export function WordDetailCard({
           >
             <Volume2 size={18} />
           </button>
-          {!selectMode && onDelete && (
-            <button
-              onClick={onDelete}
-              className="rounded-full p-2.5 min-w-[40px] min-h-[40px] text-slate-400 hover:text-red-500"
-              style={{ backgroundColor: "#F8FAFC" }}
-              aria-label={`Delete ${w.word}`}
-            >
-              <Trash2 size={18} />
-            </button>
-          )}
         </div>
       </div>
 
