@@ -4,7 +4,7 @@ import type { GeneratedWord } from "@/lib/types";
 import { BadRequestError } from "@/lib/server/api-utils";
 
 // Fast, generous-free-tier multimodal model. Override with GEMINI_MODEL if needed.
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };

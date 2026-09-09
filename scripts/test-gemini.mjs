@@ -7,13 +7,13 @@
 //   GEMINI_API_KEY=xxx node scripts/test-gemini.mjs                 # word-generation only
 //   GEMINI_API_KEY=xxx node scripts/test-gemini.mjs ./photo.jpeg    # + image/PDF extraction
 //
-// Optional: GEMINI_MODEL=gemini-2.5-flash  (defaults to gemini-2.5-flash-lite)
+// Optional: GEMINI_MODEL=gemini-3.5-flash  (defaults to gemini-3.5-flash-lite)
 
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 
 const API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 if (!API_KEY) {
