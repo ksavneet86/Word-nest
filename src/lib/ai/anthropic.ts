@@ -19,18 +19,44 @@ function extractText(content: Anthropic.Messages.ContentBlock[]) {
 }
 
 /**
+ * Pulls the human-readable message out of an Anthropic API error. The SDK nests it at
+ * `error.error.message` (the raw JSON body `{ type: "error", error: { type, message } }`),
+ * with a flatter `error.message` on some versions — try both, then the SDK's own composed
+ * `.message` as a last resort.
+ */
+function anthropicErrorDetail(e: unknown): string | null {
+  if (!(e instanceof Anthropic.APIError)) return null;
+  const body = e.error as { message?: unknown; error?: { message?: unknown } } | undefined;
+  const candidates = [body?.error?.message, body?.message, e.message];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return null;
+}
+
+/**
  * Wraps client().messages.create() so a rejection from Claude's API (bad image data,
  * unsupported format, etc.) becomes a BadRequestError with a message users actually see,
  * instead of an unhandled exception that api-utils.ts flattens into "Something went wrong".
+ * The real Anthropic error text is surfaced to the user in every environment, since the
+ * generic fallback strings hid what was actually wrong and server logs aren't always reachable.
  */
 async function createMessage(params: Anthropic.MessageCreateParamsNonStreaming) {
   try {
     return await client().messages.create(params);
   } catch (e) {
     console.error("[anthropic] request failed", e);
+    const detail = anthropicErrorDetail(e);
+    if (e instanceof Anthropic.APIError && e.status === 400) {
+      throw new BadRequestError(
+        detail
+          ? `Claude rejected that request: ${detail}`
+          : "Couldn't read that file — try a different photo (JPEG, PNG, GIF, WEBP) or a PDF instead."
+      );
+    }
     throw new BadRequestError(
-      e instanceof Anthropic.APIError && e.status === 400
-        ? "Couldn't read that file — try a different photo (JPEG, PNG, GIF, WEBP) or a PDF instead."
+      detail
+        ? `The AI service had trouble with that request: ${detail}`
         : "The AI service had trouble with that request — please try again in a moment."
     );
   }
